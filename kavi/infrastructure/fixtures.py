@@ -339,112 +339,18 @@ def tasks() -> list[dict[str, Any]]:
 
 
 def evidence() -> list[dict[str, Any]]:
-    return [
-        {
-            "id": "CLM-2026-001",
-            "claim": "US average construction dispute value $56.0m, duration 12.2 months",
-            "classification": "FACT",
-            "source": "Arcadis 16th Global Construction Disputes Report",
-            "source_date": "2025",
-            "locator": "Arcadis CDR 16th edition",
-            "confidence": "HIGH",
-            "freshness": "Current",
-            "contradiction": "Value fell from $60.1m / 12.5 months in the 15th CDR — severity trend is downward",
-            "objective_id": "OBJ-2026-001",
-            "origin": FIXTURE,
-        },
-        {
-            "id": "CLM-2026-002",
-            "claim": "Across 2,204 projects, disputed sums equal 33.4% of contract budgets; EOT claims equal 65.8% of planned schedules",
-            "classification": "FACT",
-            "source": "HKA CRUX 8th edition",
-            "source_date": "2025",
-            "locator": "HKA CRUX Insight 8th",
-            "confidence": "HIGH",
-            "freshness": "Current",
-            "contradiction": "Sample covers distressed projects; denominator unpublished, so this is not a population base rate",
-            "objective_id": "OBJ-2026-001",
-            "origin": FIXTURE,
-        },
-        {
-            "id": "CLM-2026-003",
-            "claim": "Where there is no contemporary record to support a claim, that claim fails; witness statements cannot substitute",
-            "classification": "FACT",
-            "source": "AG Falkland Islands v Gordon Forbes",
-            "source_date": "2003",
-            "locator": "Judgment, Falkland Islands",
-            "confidence": "HIGH",
-            "freshness": "Old but leading authority",
-            "contradiction": "Skitmore regression (n=11) found only programme and drawing records improved recovery",
-            "objective_id": "OBJ-2026-001",
-            "origin": FIXTURE,
-        },
-        {
-            "id": "CLM-2026-004",
-            "claim": "Records failure is the mechanism by which claims fail, not a ranked cause of disputes",
-            "classification": "INFERENCE",
-            "source": "Derived from Arcadis CDR cause ranking and Gordon Forbes",
-            "source_date": "2026-09-04",
-            "locator": "OBJ-2026-001 Evidence Register CLM-005",
-            "confidence": "MEDIUM",
-            "freshness": "Current",
-            "contradiction": "Changes the sales narrative: the felt pain is lost entitlement, not record-keeping hygiene",
-            "objective_id": "OBJ-2026-001",
-            "origin": FIXTURE,
-        },
-        {
-            "id": "CLM-2026-005",
-            "claim": "77% of GCs perform project controls in spreadsheets even when they already own an ERP",
-            "classification": "FACT",
-            "source": "Dodge / CMiC, n=216 GCs and 123 trades",
-            "source_date": "2025-03/04",
-            "locator": "Dodge Construction Network study",
-            "confidence": "HIGH",
-            "freshness": "Current",
-            "contradiction": "Same study locates trades' spreadsheet dominance in inventory/equipment — cuts against the MEP wedge",
-            "objective_id": "OBJ-2026-001",
-            "origin": FIXTURE,
-        },
-        {
-            "id": "CLM-2026-006",
-            "claim": "Only 7,925 US electrical contractors sit in the 20–499 employee band",
-            "classification": "FACT",
-            "source": "US Census SUSB, computed from source data",
-            "source_date": "2022",
-            "locator": "Census SUSB NAICS 238210",
-            "confidence": "HIGH",
-            "freshness": "4 years old",
-            "contradiction": "Reachable-and-viable sub-band is small in absolute terms",
-            "objective_id": "OBJ-2026-001",
-            "origin": FIXTURE,
-        },
-        {
-            "id": "CLM-2026-007",
-            "claim": "Willingness-to-pay for VECYRA",
-            "classification": "UNKNOWN",
-            "source": "",
-            "source_date": "",
-            "locator": "",
-            "confidence": "LOW",
-            "freshness": "",
-            "contradiction": "Structurally unobservable through desk research. Requires buyer contact.",
-            "objective_id": "OBJ-2026-001",
-            "origin": FIXTURE,
-        },
-        {
-            "id": "CLM-2026-008",
-            "claim": "Base rate of claims that fail for want of records",
-            "classification": "UNKNOWN",
-            "source": "",
-            "source_date": "",
-            "locator": "",
-            "confidence": "LOW",
-            "freshness": "",
-            "contradiction": "The single most valuable missing number for sizing the problem",
-            "objective_id": "OBJ-2026-001",
-            "origin": FIXTURE,
-        },
-    ]
+    """No fixture evidence exists.
+
+    Claims are canonical organizational knowledge owned by the KAVI Vault. The
+    desktop reads the real evidence register instead of demonstrating with
+    invented claims. Fabricated evidence is the most dangerous fixture of all:
+    the Founder is meant to make gate decisions from this table, and a plausible
+    invented claim is indistinguishable from a real one on screen.
+
+    The previous fixture also renumbered claims (CLM-2026-001 for the real
+    CLM-001), which would have broken traceability back to the register.
+    """
+    return []
 
 
 def reviews() -> list[dict[str, Any]]:
@@ -460,7 +366,7 @@ def reviews() -> list[dict[str, Any]]:
                 "Reviewer performed no research and no synthesis on this objective and "
                 "received no reasoning trace from the synthesis path."
             ),
-            "checked_ids": "CLM-2026-001..008, Phase Gates, Opportunity Scoring",
+            "checked_ids": "CLM-001..041, Phase Gates, Opportunity Scoring",
             "findings": "Recorded in the evidence register and CEO brief.",
             "acceptance_criteria": (
                 "One problem, one segment, classified claims, no invented commercial "
@@ -538,7 +444,7 @@ def inbox() -> list[dict[str, Any]]:
                 "Recommend contemporaneous delay-evidence capture for MEP/electrical "
                 "subcontractors. Gate recommendation: REMAIN IN VALIDATE."
             ),
-            "evidence_ids": ["CLM-2026-001", "CLM-2026-002", "CLM-2026-003", "CLM-2026-005", "CLM-2026-006"],
+            "evidence_ids": ["CLM-001", "CLM-002", "CLM-006", "CLM-009", "CLM-019"],
             "authority_note": (
                 "Fully reversible. No spend, no outreach, no code. KAVI may not "
                 "advance the gate; Founder approval required."
@@ -561,7 +467,7 @@ def inbox() -> list[dict[str, Any]]:
                 "Approve 10-15 structured problem interviews per the Validation Protocol. "
                 "No pitching. The task is BLOCKED until approved."
             ),
-            "evidence_ids": ["CLM-2026-007"],
+            "evidence_ids": ["CLM-007"],
             "authority_note": "First external contact. Founder-reserved. Approval APR-2026-001 pending.",
             "state": "OPEN",
             "disposition_note": "",
@@ -581,7 +487,7 @@ def inbox() -> list[dict[str, Any]]:
                 "Dodge/CMiC locates the project-controls spreadsheet problem in GCs (77%), "
                 "not trades. Consider redirecting the segment before spending interview budget."
             ),
-            "evidence_ids": ["CLM-2026-005"],
+            "evidence_ids": ["CLM-019"],
             "authority_note": "Contradiction preserved, not discarded. Founder judgement required.",
             "state": "OPEN",
             "disposition_note": "",

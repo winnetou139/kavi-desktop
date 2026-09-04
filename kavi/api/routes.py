@@ -181,6 +181,7 @@ def build_router(service: CockpitService) -> Router:
         return {
             "evidence": service.list_evidence(),
             "summary": service.evidence_summary(),
+            "status": service.evidence_status(),
         }
 
     return router

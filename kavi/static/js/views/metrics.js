@@ -15,7 +15,10 @@ export async function render(host, ctx) {
   const metrics = await api.metrics();
   const runtime = await api.runtime();
   const storage = await api.storage();
+  const evidenceData = await api.evidence();
   const evidence = metrics.evidence;
+  const evStatus = evidenceData.status || {};
+  const evSummary = evidenceData.summary || {};
 
   ctx.setHeadStats([
     { v: metrics.work.objectives_total, l: 'Objectives', tone: 'mint' },
@@ -40,7 +43,23 @@ export async function render(host, ctx) {
     el('td', {}, [el('b', { text: 'With contradiction preserved' })]),
     el('td', { class: 'num', text: String(evidence.with_contradiction) }),
   ]));
+  // D-006: these classes may never be cited as external market validation.
+  tbody.appendChild(el('tr', {}, [
+    el('td', {}, [el('b', { text: 'Not external market validation' })]),
+    el('td', { class: 'num', text: String(evSummary.non_market_claims ?? '—') }),
+  ]));
   classRows.appendChild(tbody);
+
+  const confidenceRows = el('table', { class: 'grid' }, [
+    el('thead', {}, [el('tr', {}, [
+      el('th', { text: 'Confidence' }), el('th', { text: 'Claims' }),
+    ])]),
+    el('tbody', {}, Object.entries(evSummary.by_confidence || {}).map(([name, count]) =>
+      el('tr', {}, [
+        el('td', {}, [chip(name, name === 'HIGH' ? 'mint' : name === 'LOW' ? 'red' : 'amber')]),
+        el('td', { class: 'num', text: String(count) }),
+      ]))),
+  ]);
 
   const recordRows = el('table', { class: 'grid' }, [
     el('thead', {}, [el('tr', {}, [
@@ -115,10 +134,19 @@ export async function render(host, ctx) {
         }),
       ])),
     ]),
-    el('div', { class: 'cols-eq' }, [
-      panel('Evidence classification', [], classRows),
-      panel('Record origin', [], recordRows),
-    ]),
+    panel('Evidence register', [
+      chip(evStatus.source || 'UNKNOWN', 'mint'), chip('READ ONLY', 'amber'),
+    ], el('div', { class: 'panel-body' }, [
+      notice(
+        `<b>${evStatus.claim_count ?? 0} canonical claims</b> read from `
+        + `<span class="mono">${evStatus.path || '—'}</span>.<br>`
+        + `${evStatus.detail || ''}`
+        + (evStatus.scope_limit ? `<br><b>Scope limit:</b> ${evStatus.scope_limit}` : ''),
+        'amber',
+      ),
+      el('div', { class: 'cols-eq' }, [classRows, confidenceRows]),
+    ])),
+    panel('Record origin', [], recordRows),
     panel('Where state is stored', [], el('div', { class: 'panel-body' }, [
       kv([
         ['Local operational store', storage.operational_store.path],

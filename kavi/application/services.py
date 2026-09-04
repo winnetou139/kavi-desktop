@@ -300,7 +300,7 @@ class CockpitService:
 
     def list_inbox(self, *, include_closed: bool = True) -> list[dict[str, Any]]:
         items = self.repo.list("inbox")
-        evidence_by_id = {e["id"]: e for e in self.repo.list("evidence")}
+        evidence_by_id = {e["id"]: e for e in self.list_evidence()}
         for item in items:
             item["evidence"] = [
                 evidence_by_id[e] for e in item.get("evidence_ids", []) if e in evidence_by_id
@@ -534,22 +534,49 @@ class CockpitService:
     # ---------------------------------------------------------- evidence
 
     def list_evidence(self) -> list[dict[str, Any]]:
-        return self.repo.list("evidence")
+        """Canonical claims, read from the vault's evidence register.
+
+        Local claims are merged in and stay marked LOCAL. If the vault cannot be
+        read, this returns whatever is local rather than inventing evidence.
+        """
+        canonical = self.vault.evidence()
+        local = [e for e in self.repo.list("evidence") if e.get("origin") != "FIXTURE"]
+        known = {e["id"] for e in canonical}
+        return canonical + [e for e in local if e["id"] not in known]
+
+    def evidence_status(self) -> dict[str, Any]:
+        return self.vault.evidence_status()
+
+    def get_evidence(self, claim_id: str) -> dict[str, Any] | None:
+        for row in self.list_evidence():
+            if row.get("id") == claim_id:
+                return row
+        return None
 
     def evidence_summary(self) -> dict[str, Any]:
         rows = self.list_evidence()
         by_class: dict[str, int] = {c: 0 for c in states.EVIDENCE_CLASSES}
+        by_confidence: dict[str, int] = {}
         contradictions = 0
         for row in rows:
-            by_class[row.get("classification", "UNKNOWN")] = (
-                by_class.get(row.get("classification", "UNKNOWN"), 0) + 1
-            )
+            classification = row.get("classification", "UNKNOWN")
+            by_class[classification] = by_class.get(classification, 0) + 1
+            confidence = str(row.get("confidence", "")).strip() or "NOT STATED"
+            by_confidence[confidence] = by_confidence.get(confidence, 0) + 1
             if str(row.get("contradiction", "")).strip():
                 contradictions += 1
+
+        # D-006: founder/domain evidence is never external market validation.
+        non_market = sum(
+            by_class.get(c, 0) for c in states.NON_MARKET_EVIDENCE_CLASSES
+        )
         return {
             "total": len(rows),
             "by_classification": by_class,
+            "by_confidence": by_confidence,
             "with_contradiction": contradictions,
+            "non_market_claims": non_market,
+            "market_validation": "NONE — no buyer-side evidence exists",
         }
 
     # ---------------------------------------------------- organization

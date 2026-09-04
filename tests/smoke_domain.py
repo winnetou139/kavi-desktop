@@ -28,8 +28,16 @@ def body(t) -> None:
     t.check("BLOCKED is a task state", "BLOCKED" in states.TASK_STATES)
     t.check("venture SELL not SELL_PILOT", "SELL" in states.VENTURE_STATES)
     t.check("SELL_PILOT absent", "SELL_PILOT" not in states.VENTURE_STATES)
-    t.equals("evidence classes", states.EVIDENCE_CLASSES,
-             ("FACT", "INFERENCE", "HYPOTHESIS", "UNKNOWN"))
+    t.check("epistemic classes present",
+            {"FACT", "INFERENCE", "HYPOTHESIS", "UNKNOWN"} <= set(states.EVIDENCE_CLASSES))
+    # D-006 requires the Founder's domain knowledge to be its own class so it
+    # can never be quietly counted as external market validation.
+    t.check("founder/domain evidence is a distinct class",
+            "FOUNDER / DOMAIN EVIDENCE" in states.EVIDENCE_CLASSES)
+    t.check("founder/domain evidence is non-market",
+            "FOUNDER / DOMAIN EVIDENCE" in states.NON_MARKET_EVIDENCE_CLASSES)
+    t.check("FACT is never non-market",
+            "FACT" not in states.NON_MARKET_EVIDENCE_CLASSES)
     t.equals("review results include conditions",
              "PASS_WITH_CONDITIONS" in states.REVIEW_RESULTS, True)
 

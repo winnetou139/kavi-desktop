@@ -30,7 +30,20 @@ VENTURE_STATES = (
     "AUTONOMIZE",
 )
 
-EVIDENCE_CLASSES = ("FACT", "INFERENCE", "HYPOTHESIS", "UNKNOWN")
+# Epistemic classification of a claim.
+# FOUNDER / DOMAIN EVIDENCE is deliberately its own class: D-006 forbids
+# treating the Founder's domain knowledge as external market validation, so it
+# must never be silently folded into FACT.
+EVIDENCE_CLASSES = (
+    "FACT",
+    "INFERENCE",
+    "HYPOTHESIS",
+    "UNKNOWN",
+    "FOUNDER / DOMAIN EVIDENCE",
+)
+
+# Classes that may never be cited as external market validation.
+NON_MARKET_EVIDENCE_CLASSES = ("FOUNDER / DOMAIN EVIDENCE", "HYPOTHESIS", "UNKNOWN")
 
 REVIEW_RESULTS = ("PENDING", "PASS", "PASS_WITH_CONDITIONS", "FAIL")
 

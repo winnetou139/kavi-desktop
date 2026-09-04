@@ -481,10 +481,113 @@ def body_canonical_decisions(t):
                 "canonical vault" in str(exc))
 
 
+# -------------------------------------------------- canonical evidence
+
+
+def body_canonical_evidence(t):
+    """Claims must come from the vault register, with contradictions intact."""
+    import pathlib
+    import tempfile
+
+    from kavi.container import build_service
+    from kavi.domain import states
+
+    store = pathlib.Path(tempfile.mkdtemp()) / "kavi.json"
+    s = build_service(data_path=store)
+
+    from kavi.infrastructure import fixtures
+    t.check("no fixture evidence exists at all", fixtures.evidence() == [])
+
+    claims = s.list_evidence()
+    t.check("canonical claims are read", len(claims) >= 40, str(len(claims)))
+    t.check("no claim is fixture origin",
+            all(c.get("origin") != "FIXTURE" for c in claims))
+    t.check("canonical claims are marked VAULT",
+            all(c.get("origin") == "VAULT" for c in claims))
+
+    by_id = {c["id"]: c for c in claims}
+    t.check("claims keep their real register ids", "CLM-001" in by_id)
+    t.check("claims are not renumbered", not any(c.startswith("CLM-2026-") for c in by_id))
+
+    # Every claim must carry provenance, not just a sentence.
+    for claim in claims:
+        t.check(f"{claim['id']} has a claim body", len(claim["claim"]) > 10)
+    # An UNKNOWN claim legitimately has no source: nothing was found. Requiring
+    # a source there would invite fabrication. Sourced claims are the ones that
+    # must carry provenance.
+    # Founder/domain evidence has no external source by definition — the
+    # Founder is the source, and section G omits the column entirely.
+    sourced = [c for c in claims
+               if c["classification"] not in ("UNKNOWN", "FOUNDER / DOMAIN EVIDENCE")]
+    t.check("sourced claims carry a source",
+            all(c["source"] for c in sourced),
+            str([c["id"] for c in sourced if not c["source"]]))
+    t.check("sourced claims carry an evidence kind",
+            sum(1 for c in sourced if c["kind"]) >= len(sourced) - 5)
+    t.check("sourced claims carry a locator",
+            sum(1 for c in sourced if c["locator"]) >= 30)
+    t.check("sourced claims carry an access date",
+            sum(1 for c in sourced if c["access_date"]) >= 30)
+
+    # And an UNKNOWN must never acquire a source out of nowhere.
+    unknowns = [c for c in claims if c["classification"] == "UNKNOWN"]
+    t.check("unknown claims exist and are preserved", len(unknowns) >= 5)
+    t.check("unknown claims state their limitation",
+            all(c["contradiction"] or c["claim"] for c in unknowns))
+
+    # Contradictions must survive to the reader. This is the whole point of the
+    # Evidence and Review Contract, and the easiest thing to quietly lose.
+    with_caveat = [c for c in claims if c["contradiction"]]
+    t.check("contradictions are preserved", len(with_caveat) >= 30, str(len(with_caveat)))
+
+    c1 = by_id.get("CLM-001", {})
+    t.check("CLM-001 keeps its downward-trend caveat",
+            "downward" in c1.get("contradiction", ""))
+    c7 = by_id.get("CLM-007", {})
+    t.check("CLM-007 discloses the primary text was never retrieved",
+            "never retrieved" in c7.get("contradiction", ""))
+    t.check("CLM-007 confidence is not overstated", c7.get("confidence") == "MEDIUM")
+
+    # D-006: founder/domain evidence is its own class, never market validation.
+    founder_claims = [c for c in claims
+                      if c["classification"] == "FOUNDER / DOMAIN EVIDENCE"]
+    t.check("founder/domain evidence is a distinct class", len(founder_claims) >= 1)
+    t.check("founder evidence is not classified as FACT",
+            all(c["classification"] != "FACT" for c in founder_claims))
+    t.check("founder/domain evidence is a recognised class",
+            "FOUNDER / DOMAIN EVIDENCE" in states.EVIDENCE_CLASSES)
+    for claim in founder_claims:
+        t.check(f"{claim['id']} states it is not market validation",
+                "market validation" in claim["contradiction"].lower())
+
+    summary = s.evidence_summary()
+    t.check("summary counts every claim", summary["total"] == len(claims))
+    t.check("summary breaks down confidence", "HIGH" in summary["by_confidence"])
+    t.check("summary counts non-market claims", summary["non_market_claims"] >= 1)
+    t.check("summary states no market validation exists",
+            "NONE" in summary["market_validation"])
+
+    status = s.evidence_status()
+    t.check("evidence source is stated", status["source"] == "CANONICAL VAULT")
+    t.check("evidence access is read only", status["access"] == "READ ONLY")
+    t.check("evidence scope limit is carried", "desk research" in status["scope_limit"])
+    t.check("status says the desktop never authors a claim",
+            "never authors" in status["detail"])
+
+    # Inbox evidence references must resolve against the canonical register.
+    for item in s.list_inbox():
+        for claim_id in item.get("evidence_ids", []):
+            t.check(f"{item['id']} cites a real claim {claim_id}", claim_id in by_id)
+    referenced = [i for i in s.list_inbox() if i.get("evidence_ids")]
+    t.check("inbox items resolve their evidence",
+            all(len(i["evidence"]) == len(i["evidence_ids"]) for i in referenced))
+
+
 def body(t):
     body_core(t)
     body_functionalization(t)
     body_canonical_decisions(t)
+    body_canonical_evidence(t)
 
 
 if __name__ == "__main__":

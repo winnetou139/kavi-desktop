@@ -35,6 +35,19 @@ def resolve_vault_path(explicit: str | None = None) -> pathlib.Path | None:
     return None
 
 
+def _strip_markdown(value: str) -> str:
+    """Remove inline markdown emphasis and code ticks, keeping the words.
+
+    Emphasis in the register marks reviewer corrections; the emphasis itself is
+    presentation, but the text it wraps is meaning and must never be lost.
+    """
+    value = re.sub(r"\*\*(.+?)\*\*", r"\1", value)
+    value = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"\1", value)
+    value = value.replace("`", "")
+    value = re.sub(r"\[\[([^\]]+)\]\]", lambda m: m.group(1).split("|")[0], value)
+    return " ".join(value.split()).strip()
+
+
 def _parse_frontmatter(text: str) -> dict[str, str]:
     match = _FRONTMATTER.match(text)
     if not match:
@@ -289,6 +302,134 @@ class VaultReader:
             "alternatives": section("Alternatives considered"),
             "source_path": str(path.relative_to(self.root)),
             "origin": "VAULT",
+        }
+
+    # ------------------------------------------------------------- evidence
+
+    EVIDENCE_REGISTER = "07_RESEARCH/OBJ-2026-001 Evidence Register.md"
+
+    def evidence(self, relative_path: str | None = None) -> list[dict[str, Any]]:
+        """Read the canonical evidence register.
+
+        Claims are organizational knowledge owned by the vault. Each row keeps
+        its real ID, classification, confidence, and — critically — its recorded
+        contradiction or limitation. Contradictions are never dropped: the
+        Evidence and Review Contract requires them to survive to the reader.
+        """
+        if not self.available:
+            return []
+        assert self.root is not None
+        target = self.root / (relative_path or self.EVIDENCE_REGISTER)
+        if not target.is_file():
+            return []
+        try:
+            text = target.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return []
+
+        source_path = str(target.relative_to(self.root))
+        rows: list[dict[str, Any]] = []
+        section = ""
+        headers: list[str] = []
+
+        for line in text.splitlines():
+            stripped = line.strip()
+
+            heading = re.match(r"^##\s+(.+)$", stripped)
+            if heading:
+                section = heading.group(1).strip()
+                headers = []
+                continue
+
+            if not stripped.startswith("|"):
+                continue
+
+            cells = [c.strip() for c in stripped.strip("|").split("|")]
+            if not cells:
+                continue
+
+            # A header row redefines the columns for the table that follows;
+            # section G uses a shorter column set than the others.
+            if cells[0] == "ID":
+                headers = [c.lower() for c in cells]
+                continue
+            if set(stripped) <= set("|-: "):
+                continue
+            if not headers or not re.match(r"^CLM-\d+$", cells[0]):
+                continue
+
+            row = dict(zip(headers, cells))
+            rows.append(self._evidence_row(row, section, source_path))
+
+        return rows
+
+    def _evidence_row(
+        self, row: dict[str, str], section: str, source_path: str
+    ) -> dict[str, Any]:
+        def field(*names: str) -> str:
+            for name in names:
+                value = row.get(name, "").strip()
+                if value and value not in ("—", "-"):
+                    return _strip_markdown(value)
+            return ""
+
+        classification = field("class").upper() or "UNKNOWN"
+        return {
+            "id": field("id"),
+            "claim": field("claim"),
+            "classification": classification,
+            "source": field("source"),
+            "source_date": field("source date"),
+            "kind": field("kind"),
+            "locator": field("locator"),
+            "access_date": field("access date"),
+            "confidence": field("confidence").upper(),
+            "freshness": field("freshness"),
+            # Whatever the column is called, the caveat must survive.
+            "contradiction": field(
+                "contradiction / limitation",
+                "why it threatens the recommendation",
+                "limitation",
+                "note",
+            ),
+            "section": section,
+            "objective_id": "OBJ-2026-001",
+            "source_path": source_path,
+            "origin": "VAULT",
+        }
+
+    def evidence_status(self) -> dict[str, Any]:
+        """Where the evidence register is read from, and its stated scope."""
+        if not self.available:
+            return {
+                "source": "VAULT NOT AVAILABLE",
+                "path": "",
+                "access": "READ ONLY",
+                "claim_count": 0,
+                "detail": (
+                    "The canonical vault could not be read, so no claim is shown. "
+                    "Nothing is substituted in its place."
+                ),
+            }
+        assert self.root is not None
+        claims = self.evidence()
+        target = self.root / self.EVIDENCE_REGISTER
+        scope = ""
+        if target.is_file():
+            text = target.read_text(encoding="utf-8")
+            match = re.search(r"\*\*Scope limit:\*\*\s*(.+)", text)
+            if match:
+                scope = _strip_markdown(match.group(1).strip())
+        return {
+            "source": "CANONICAL VAULT" if claims else "REGISTER NOT FOUND",
+            "path": self.EVIDENCE_REGISTER,
+            "access": "READ ONLY",
+            "claim_count": len(claims),
+            "scope_limit": scope,
+            "detail": (
+                "Claims are read from the canonical evidence register. The desktop "
+                "never authors a claim, and never drops a recorded contradiction."
+            ),
         }
 
     def search(self, query: str, *, limit: int = 60) -> list[dict[str, Any]]:
