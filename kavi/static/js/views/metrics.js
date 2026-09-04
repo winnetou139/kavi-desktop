@@ -1,6 +1,7 @@
 // Metrics & Cost — reports what is measured, and says so when nothing is.
 import { api } from '../api.js';
 import { el, chip, panel, kv, notice, valueOr } from '../ui.js';
+import { t as tr } from '../i18n.js';
 
 export const meta = {
   id: 'metrics',
@@ -79,9 +80,24 @@ export async function render(host, ctx) {
   recordRows.appendChild(rbody);
 
   // The Engine Room readout. Every line reports what is actually true.
+  // Each technical key gets a plain-language label. The value itself is a
+  // governed term and is never translated.
+  const ENGINE_LABELS = {
+    MODE: 'status.mode',
+    VPS: 'status.server',
+    RUNTIME: 'status.mode',
+    SCHEDULER: 'status.scheduler',
+    QUEUE: 'status.queue',
+    'PROVIDER ROUTER': 'status.router',
+    VAULT: 'status.vault',
+    COST: 'status.cost',
+  };
   const engineRoom = el('table', { class: 'grid engine-room' }, [
     el('tbody', {}, (runtime.engine_room_panel || []).map(([label, value]) => el('tr', {}, [
-      el('td', { class: 'er-label', text: label }),
+      el('td', { class: 'er-label' }, [
+        el('div', { class: 'er-name', text: tr(ENGINE_LABELS[label] || '', label) }),
+        el('div', { class: 'er-key mono', text: label }),
+      ]),
       el('td', { class: 'er-value' }, [chip(value, toneForRuntime(value))]),
     ]))),
   ]);

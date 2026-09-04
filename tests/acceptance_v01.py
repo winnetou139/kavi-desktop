@@ -61,7 +61,11 @@ def launch(profile_name: str):
     ws.call("Runtime.enable")
     ws.call("Page.enable")
     ws.call("Page.navigate", url=APP_URL)
-    time.sleep(2.5)
+    time.sleep(1.2)
+    # Pin English so the acceptance script reads the same labels every run.
+    ws.evaluate("localStorage.setItem('kavi.language','en')")
+    ws.call("Page.navigate", url=APP_URL)
+    time.sleep(2.0)
     return proc, ws
 
 

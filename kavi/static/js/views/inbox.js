@@ -11,6 +11,7 @@ import { api } from '../api.js';
 import {
   el, chip, originChip, empty, notice, toast, confirmModal, panel,
 } from '../ui.js';
+import { t as tr } from '../i18n.js';
 
 export const meta = {
   id: 'inbox',
@@ -32,10 +33,10 @@ const STATE_TONE = {
 };
 
 const DISPOSITIONS = [
-  ['APPROVED', 'Approve'],
-  ['REJECTED', 'Reject'],
-  ['DEFERRED', 'Defer'],
-  ['EVIDENCE_REQUESTED', 'Ask for evidence'],
+  ['APPROVED', 'inbox.approve'],
+  ['REJECTED', 'inbox.reject'],
+  ['DEFERRED', 'inbox.defer'],
+  ['EVIDENCE_REQUESTED', 'inbox.askEvidence'],
 ];
 
 let selectedId = null;
@@ -46,7 +47,7 @@ export async function render(host, ctx) {
   const counts = data.counts || {};
 
   host.appendChild(el('div', { class: 'stat-row' }, [
-    stat('OPEN', counts.OPEN ?? 0),
+    stat(tr('inbox.open').toUpperCase(), counts.OPEN ?? 0),
     stat('DECISION', counts.DECISION ?? 0),
     stat('APPROVAL', counts.APPROVAL ?? 0),
     stat('RISK', counts.RISK ?? 0),
@@ -54,10 +55,7 @@ export async function render(host, ctx) {
   ]));
 
   if (!items.length) {
-    host.appendChild(empty(
-      'The inbox is empty.',
-      'Founder-level items appear here when raised from a real Objective, Task, Decision or Venture.',
-    ));
+    host.appendChild(empty(tr('inbox.empty'), tr('inbox.emptyHint')));
     return;
   }
 
@@ -117,7 +115,7 @@ function detailFor(item, ctx) {
   // The real underlying object this item refers to.
   const subject = item.subject;
   rows.push(el('div', { class: 'detail-block' }, [
-    el('div', { class: 'detail-label', text: 'REFERS TO' }),
+    el('div', { class: 'detail-label', text: tr('inbox.about').toUpperCase() }),
     subject
       ? el('div', { class: 'subject-ref' }, [
           chip(subject.kind, 'muted'),
@@ -131,12 +129,12 @@ function detailFor(item, ctx) {
   ]));
 
   if (item.recommendation) {
-    rows.push(block('RECOMMENDATION', el('p', { class: 'detail-text', text: item.recommendation })));
+    rows.push(block(tr('inbox.recommendation').toUpperCase(), el('p', { class: 'detail-text', text: item.recommendation })));
   }
 
   const evidence = item.evidence || [];
   if (evidence.length) {
-    rows.push(block(`EVIDENCE (${evidence.length})`, el('div', { class: 'evidence-list' },
+    rows.push(block(`${tr('inbox.evidence').toUpperCase()} (${evidence.length})`, el('div', { class: 'evidence-list' },
       evidence.map((e) => el('div', { class: 'evidence-row' }, [
         el('div', { class: 'evidence-head' }, [
           el('span', { class: 'mono', text: e.id }),
@@ -151,11 +149,11 @@ function detailFor(item, ctx) {
   }
 
   if (item.authority_note) {
-    rows.push(block('AUTHORITY', notice(item.authority_note)));
+    rows.push(block(tr('inbox.authority').toUpperCase(), notice(item.authority_note)));
   }
 
   if (item.decided_at) {
-    rows.push(block('DISPOSITION', el('div', {}, [
+    rows.push(block(tr('inbox.decided').toUpperCase(), el('div', {}, [
       el('div', { class: 'detail-text', text: `${item.state} · ${(item.decided_at || '').slice(0, 16).replace('T', ' ')}` }),
       item.disposition_note ? el('p', { class: 'detail-text', text: item.disposition_note }) : null,
     ])));
@@ -168,22 +166,20 @@ function detailFor(item, ctx) {
 function actionsFor(item, ctx) {
   if (item.origin === 'FIXTURE') {
     return el('div', { class: 'detail-block' }, [
-      notice(
-        'This is development fixture data and cannot be decided. Raise an item from a real '
-        + 'Objective or Task in Objectives &amp; Tasks to exercise Founder disposition.',
-        'warn',
-      ),
+      notice(tr('inbox.demoLocked'), 'warn'),
     ]);
   }
   if (!['OPEN', 'DEFERRED', 'EVIDENCE_REQUESTED'].includes(item.state)) {
     return el('div', { class: 'detail-block' }, [
-      notice(`Closed as ${item.state}. No further action.`),
+      notice(`${tr('inbox.closed')} (${item.state})`),
     ]);
   }
 
   const buttons = DISPOSITIONS
     .filter(([key]) => key !== item.state)
-    .map(([key, label]) => el('button', {
+    .map(([key, labelKey]) => {
+      const label = tr(labelKey);
+      return el('button', {
       class: key === 'APPROVED' ? 'btn primary' : 'btn ghost',
       type: 'button',
       'data-disposition': key,
@@ -204,12 +200,13 @@ function actionsFor(item, ctx) {
           toast(error.message, 'err');
         }
       },
-    }));
+    });
+    });
 
   return el('div', { class: 'detail-block' }, [
-    el('div', { class: 'detail-label', text: 'FOUNDER DISPOSITION — LOCAL STATE ONLY' }),
+    el('div', { class: 'detail-label', text: tr('inbox.yourDecision').toUpperCase() }),
     el('div', { class: 'btn-row' }, buttons),
-    el('div', { class: 'detail-foot', text: 'No external action is taken. Nothing is sent, executed, or spent.' }),
+    el('div', { class: 'detail-foot', text: tr('inbox.localOnly') }),
   ]);
 }
 

@@ -1,6 +1,7 @@
 // KAVI Desktop shell: rail, router, palette, statusbar, keyboard.
 import { api } from './api.js';
 import { el, clear, svg, toast, chip } from './ui.js';
+import { t as tr, both, initLanguage, language, setLanguage, LANGUAGES } from './i18n.js';
 
 import * as command from './views/command.js';
 import * as inbox from './views/inbox.js';
@@ -49,14 +50,22 @@ let pendingActions = [];
 function drawRail() {
   clear(railHost);
   const groups = RAIL_GROUPS;
+  // Group headings are translated too, so the rail reads in one language.
+
   for (const group of groups) {
-    railHost.appendChild(el('div', { class: 'rail-sec', text: group }));
+    railHost.appendChild(el('div', {
+      class: 'rail-sec', text: tr(`group.${group}`, group),
+    }));
     for (const view of VIEWS.filter((v) => v.meta.group === group)) {
+      // The rail shows a plain-language name; the other language sits in the
+      // tooltip so the Founder can always cross-check a term.
+      const name = tr(`nav.${view.meta.id}`, view.meta.title);
       const item = el('button', {
         class: `nav-item ${view.meta.id === state.current ? 'active' : ''}`.trim(),
         type: 'button',
+        title: `${name} — ${both(`nav.${view.meta.id}`)}`,
         onclick: () => navigate(view.meta.id),
-      }, [svg(view.meta.icon), el('span', { text: view.meta.title })]);
+      }, [svg(view.meta.icon), el('span', { text: name })]);
 
       const badge = badgeFor(view.meta.id);
       item.appendChild(badge || el('span', { class: 'nav-key', text: view.meta.key }));
@@ -74,10 +83,32 @@ function drawRail() {
       ]),
     ]),
     el('div', { class: 'auth-chip' }, [
-      el('span', { text: 'HUMAN AUTHORITY' }),
-      el('b', { text: 'EXPLICIT' }),
+      el('span', { text: tr('auth.humanApproval') }),
+      el('b', { text: tr('app.readonly') === 'Hanya baca' ? 'WAJIB' : 'REQUIRED' }),
     ]),
+    languageSwitch(),
   ]));
+}
+
+/** Two small buttons: EN and ID. The choice is remembered. */
+function languageSwitch() {
+  const wrap = el('div', { class: 'lang-switch', title: tr('app.language') });
+  for (const option of LANGUAGES) {
+    wrap.appendChild(el('button', {
+      class: `lang-opt${option.code === language() ? ' active' : ''}`,
+      type: 'button',
+      'data-lang': option.code,
+      text: option.short,
+      title: option.label,
+      onclick: () => {
+        if (option.code === language()) return;
+        setLanguage(option.code);
+        drawRail();
+        navigate(state.current, { silent: true });
+      },
+    }));
+  }
+  return wrap;
 }
 
 function badgeFor(id) {
@@ -148,8 +179,8 @@ async function navigate(id, options = {}) {
   const screen = el('div', { class: 'screen' });
   const head = el('div', { class: 'screen-head' }, [
     el('div', {}, [
-      el('div', { class: 'screen-title', text: view.meta.title }),
-      el('div', { class: 'screen-sub', text: view.meta.subtitle }),
+      el('div', { class: 'screen-title', text: tr(`nav.${id}`, view.meta.title) }),
+      el('div', { class: 'screen-sub', text: tr(`nav.${id}.sub`, view.meta.subtitle) }),
     ]),
   ]);
   screen.appendChild(head);
@@ -276,6 +307,7 @@ setInterval(tick, 1000);
 // -------------------------------------------------------------------- boot
 
 (async function boot() {
+  initLanguage();
   try {
     const summary = await api.summary();
     ctx.setSummary(summary);

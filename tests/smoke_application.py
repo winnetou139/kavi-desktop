@@ -14,6 +14,7 @@ from tests.harness import main  # noqa: E402
 from kavi.api.routes import build_router  # noqa: E402
 from kavi.application.services import UseCaseError  # noqa: E402
 from kavi.container import build_service  # noqa: E402
+from kavi.domain import states  # noqa: E402
 
 
 def body_core(t) -> None:
@@ -189,8 +190,16 @@ def body_core(t) -> None:
     # ---------------------------------------------------------- decisions
     decisions = service.list_decisions()
     t.check("D-006 present", any(d["id"] == "D-006" for d in decisions))
-    t.check("all fixture decisions approved",
-            all(d["state"] == "APPROVED" for d in decisions))
+    # Decisions come from the vault now, so their state is whatever the record
+    # says. A PROPOSED decision is legitimate and must not be forced to APPROVED.
+    t.check("decision states are governed values",
+            all(d["state"] in states.DECISION_STATES or d["state"] == "UNKNOWN"
+                for d in decisions),
+            str(sorted({d["state"] for d in decisions})))
+    t.check("the six approved decisions are approved",
+            all(d["state"] == "APPROVED"
+                for d in decisions if d["id"] in
+                ("D-001", "D-002", "D-003", "D-004", "D-005", "D-006")))
 
     # ------------------------------------------------------ organization
     org = service.organization()

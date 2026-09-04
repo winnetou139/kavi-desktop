@@ -262,7 +262,8 @@ table.grid td b{color:var(--txt);font-weight:600}
   letter-spacing:.12em;text-transform:uppercase;margin-top:3px}
 
 /* =============================== inbox ============================= */
-.inbox-list{width:400px;flex:none;border-right:1px solid var(--line);overflow-y:auto;background:var(--bg)}
+/* superseded by the grid layout below — width now comes from .inbox-split */
+.inbox-list{border-right:1px solid var(--line);overflow-y:auto;background:var(--bg)}
 .inbox-item{padding:var(--sp-6) var(--sp-8);border-bottom:1px solid var(--line);cursor:pointer;
   border-left:2px solid transparent;width:100%;text-align:left;background:none;
   font-family:var(--sans);color:var(--txt);display:block}
@@ -272,7 +273,7 @@ table.grid td b{color:var(--txt);font-weight:600}
 .inbox-item h4{font-size:var(--fs-base);font-weight:600;line-height:1.4}
 .inbox-item .meta{font-family:var(--mono);font-size:var(--fs-label);color:var(--txt-3);
   margin-top:5px;letter-spacing:.05em}
-.inbox-detail{flex:1;overflow-y:auto;padding:var(--sp-10) 28px;background:var(--bg)}
+.inbox-detail{overflow-y:auto;background:var(--bg)}
 .detail-kicker{display:flex;gap:var(--sp-3);align-items:center;margin-bottom:var(--sp-5)}
 .detail-title{font-family:var(--disp);font-size:var(--fs-2xl);font-weight:600;
   letter-spacing:-.01em;margin-bottom:var(--sp-2)}
@@ -432,13 +433,12 @@ table.grid td b{color:var(--txt);font-weight:600}
 @media(max-width:1180px){
   .cols-2,.cols-eq{grid-template-columns:1fr}
   .org-divs{grid-template-columns:repeat(3,1fr)}
-  .inbox-list{width:320px}
+  /* width handled by the responsive grid rule */
   .mem-list{width:290px}
 }
 
 /* ---------------------------------------------------- CEO Inbox split */
-.inbox-split { display:grid; grid-template-columns:340px 1fr; gap:14px; align-items:start; }
-.inbox-list { display:flex; flex-direction:column; gap:6px; max-height:calc(100vh - 260px); overflow:auto; }
+.inbox-list { display:flex; flex-direction:column; gap:6px; }
 .inbox-row { text-align:left; background:var(--pan); border:1px solid var(--line); border-radius:4px;
   padding:10px 12px; cursor:pointer; display:flex; flex-direction:column; gap:6px; }
 .inbox-row:hover { border-color:var(--line-2); }
@@ -514,3 +514,221 @@ tr.clickable { cursor:pointer; }
 tr.clickable:hover { background:var(--pan-2); }
 tr.clickable.sel { background:var(--pan-2); box-shadow:inset 2px 0 0 var(--amber); }
 td.reversible { max-width:340px; font-size:10.5px; color:var(--txt-3); line-height:1.5; }
+
+/* ============================================================
+   UI/UX refinement — readability, breathing room, hierarchy
+   ============================================================ */
+
+/* Language switch in the rail footer */
+.lang-switch { display:flex; gap:4px; margin-top:10px; }
+.lang-opt {
+  flex:1; background:transparent; border:1px solid var(--line);
+  border-radius:4px; color:var(--txt-4); font-family:var(--mono);
+  font-size:10px; letter-spacing:.06em; padding:5px 0; cursor:pointer;
+  transition:border-color .12s ease, color .12s ease, background .12s ease;
+}
+.lang-opt:hover { color:var(--txt-2); border-color:var(--line-2); }
+.lang-opt.active {
+  background:var(--pan-2); border-color:var(--amber); color:var(--amber);
+}
+
+/* Engine Room reads as a label + its technical key, not a shouted key */
+.engine-room .er-label { width:230px; padding-top:10px; padding-bottom:10px; }
+.engine-room .er-name { font-size:12px; color:var(--txt-2); line-height:1.4; }
+.engine-room .er-key {
+  font-size:9px; color:var(--txt-4); letter-spacing:.07em; margin-top:2px;
+}
+
+/* Softer, more legible typography across dense surfaces */
+.detail-text, .evidence-claim, .bullet-list li { line-height:1.65; }
+.detail-title { letter-spacing:-.01em; }
+.screen-title { letter-spacing:-.01em; }
+.screen-sub { line-height:1.5; }
+
+/* Panels get consistent internal rhythm */
+.panel-body { padding:16px 18px; }
+.panel + .panel { margin-top:14px; }
+.stack > * + * { margin-top:14px; }
+
+/* Tables: more room, clearer separation, no cramped rows */
+table.grid th {
+  font-size:9.5px; letter-spacing:.08em; color:var(--txt-4);
+  font-weight:600; padding:10px 14px; white-space:nowrap;
+}
+table.grid td { padding:11px 14px; font-size:11.5px; line-height:1.55; vertical-align:top; }
+table.grid tbody tr + tr td { border-top:1px solid var(--line); }
+
+/* Chips: consistent height and spacing so rows do not jitter */
+.chip {
+  display:inline-flex; align-items:center; height:19px; padding:0 8px;
+  border-radius:3px; font-family:var(--mono); font-size:9.5px;
+  letter-spacing:.05em; white-space:nowrap;
+}
+.chip + .chip { margin-left:4px; }
+
+/* Buttons: clearer affordance and a visible focus ring for keyboard use */
+.btn {
+  transition:background .12s ease, border-color .12s ease, color .12s ease;
+}
+.btn:focus-visible,
+.nav-item:focus-visible,
+.inbox-row:focus-visible,
+.vault-row:focus-visible,
+.lang-opt:focus-visible {
+  outline:2px solid var(--amber); outline-offset:2px;
+}
+
+/* Empty states read as guidance, not as an error */
+.empty {
+  padding:34px 26px; text-align:center; color:var(--txt-3);
+  display:flex; flex-direction:column; gap:7px; align-items:center;
+}
+.empty b { color:var(--txt-1); font-size:13px; font-weight:600; }
+
+/* Notices: calmer, with a colour-coded edge instead of a loud fill */
+.notice {
+  border-left:2px solid var(--line-2); line-height:1.6; font-size:11.5px;
+  padding:12px 14px;
+}
+.notice.amber { border-left-color:var(--amber); }
+.notice.warn  { border-left-color:var(--amber); }
+
+/* Split views: comfortable columns, scroll only where needed */
+.inbox-split, .vault-split { gap:16px; }
+.inbox-list, .vault-list { scrollbar-width:thin; }
+.inbox-row { transition:border-color .12s ease, background .12s ease; }
+
+/* Long prose in a details table should not stretch to the window edge */
+.kv-value, .detail-text { max-width:78ch; }
+
+/* ============================================================
+   LAYOUT FIX — the inbox screen was overlapping and stretching
+   ============================================================
+   Two faults were visible: the stat cards stretched to the full height of
+   the screen because they were grid children, and the list column sat on top
+   of the detail panel instead of beside it. Both are fixed by giving the
+   split its own row and letting the stats keep their natural height. */
+
+/* Split views own the full screen height and scroll internally, not as a page */
+.screen-split {
+  display:flex; flex-direction:column; gap:14px;
+  padding:20px 24px; min-height:0; flex:1; overflow:hidden;
+}
+
+/* Stat cards: a single row that never stretches vertically */
+.stat-row {
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(112px, 1fr));
+  gap:10px; flex:0 0 auto; align-items:stretch; margin-bottom:0;
+}
+.stat {
+  display:flex; flex-direction:column; justify-content:center; gap:3px;
+  padding:12px 16px; min-width:0; height:auto;
+}
+.stat-value { font-size:22px; line-height:1.1; }
+.stat-label {
+  font-size:9px; letter-spacing:.08em; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis;
+}
+
+/* The list and the detail sit side by side and each scroll on their own */
+.inbox-split {
+  display:grid; grid-template-columns:minmax(300px, 360px) minmax(0, 1fr);
+  gap:16px; flex:1; min-height:0; align-items:stretch;
+}
+.inbox-list {
+  min-height:0; overflow-y:auto; overflow-x:hidden;
+  padding-right:4px; max-height:none;
+}
+.inbox-detail {
+  min-height:0; overflow-y:auto; overflow-x:hidden;
+  max-height:none; align-self:stretch;
+}
+
+/* Rows must wrap their text instead of colliding with the next row */
+.inbox-row {
+  min-height:0; height:auto; align-items:stretch;
+  padding:11px 13px; gap:7px; overflow:hidden;
+}
+.inbox-row-title {
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+  overflow:hidden; word-break:break-word; line-height:1.45;
+}
+.inbox-row-top { flex-wrap:wrap; row-gap:4px; }
+.inbox-row-meta { flex-wrap:wrap; row-gap:2px; }
+
+/* Vault split gets the same treatment */
+.vault-split {
+  display:grid; grid-template-columns:minmax(280px, 340px) minmax(0, 1fr);
+  gap:0; flex:1; min-height:0;
+}
+.vault-list, .vault-reader { min-height:0; max-height:none; overflow-y:auto; }
+
+/* Detail panel: readable measure, no edge-to-edge stretch */
+.detail { min-height:100%; }
+.detail-head { padding:18px 20px; }
+.detail-block { padding:15px 20px; }
+.detail-title { font-size:15px; line-height:1.45; word-break:break-word; }
+
+/* A quieter scrollbar, so dense lists do not look noisy */
+.inbox-list::-webkit-scrollbar,
+.inbox-detail::-webkit-scrollbar,
+.vault-list::-webkit-scrollbar,
+.vault-reader::-webkit-scrollbar { width:9px; }
+.inbox-list::-webkit-scrollbar-thumb,
+.inbox-detail::-webkit-scrollbar-thumb,
+.vault-list::-webkit-scrollbar-thumb,
+.vault-reader::-webkit-scrollbar-thumb {
+  background:var(--line-2); border-radius:5px;
+  border:2px solid transparent; background-clip:content-box;
+}
+.inbox-list::-webkit-scrollbar-track,
+.inbox-detail::-webkit-scrollbar-track,
+.vault-list::-webkit-scrollbar-track,
+.vault-reader::-webkit-scrollbar-track { background:transparent; }
+
+/* On narrower windows the split becomes one column instead of crushing */
+@media (max-width: 1180px) {
+  .inbox-split, .vault-split { grid-template-columns:minmax(0, 1fr); }
+  .inbox-list, .vault-list { max-height:320px; }
+}
+
+/* ============================================================
+   COMMAND DECK — one-press actions
+   ============================================================ */
+.deck-grid {
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(184px, 1fr)); gap:9px;
+}
+.deck-btn {
+  display:flex; flex-direction:column; gap:5px; align-items:flex-start;
+  text-align:left; padding:12px 14px; cursor:pointer;
+  background:var(--pan-2); border:1px solid var(--line); border-radius:4px;
+  transition:border-color .12s ease, background .12s ease, transform .08s ease;
+}
+.deck-btn:hover:not(.is-disabled) {
+  border-color:var(--amber); background:var(--pan);
+}
+.deck-btn:active:not(.is-disabled) { transform:translateY(1px); }
+.deck-row {
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; width:100%;
+}
+.deck-label { font-size:12px; color:var(--txt-1); font-weight:500; line-height:1.35; }
+.deck-hint {
+  font-size:10px; color:var(--txt-4); line-height:1.45;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.deck-badge {
+  min-width:19px; height:19px; padding:0 6px; border-radius:10px;
+  background:var(--amber); color:#151517; font-family:var(--mono);
+  font-size:10px; font-weight:700; display:inline-flex;
+  align-items:center; justify-content:center; flex:none;
+}
+/* A disabled action states why, and never looks pressable */
+.deck-btn.is-disabled {
+  cursor:not-allowed; opacity:.5; border-style:dashed; background:transparent;
+}
+.deck-btn.is-disabled .deck-label { color:var(--txt-3); }
+.deck-foot {
+  margin-top:12px; padding-top:11px; border-top:1px solid var(--line);
+  font-family:var(--mono); font-size:10px; color:var(--txt-4); letter-spacing:.03em;
+}

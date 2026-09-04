@@ -2,6 +2,7 @@
 import { api } from '../api.js';
 import { el, panel, chip, originChip, toast, valueOr, notice } from '../ui.js';
 import { objectiveForm } from './objectives.js';
+import { t as tr } from '../i18n.js';
 
 export const meta = {
   id: 'command',
@@ -35,6 +36,8 @@ export async function render(host, ctx) {
       input.value = '';
     }
   });
+
+  const deck = commandDeck(ctx, summary);
 
   const intake = panel('Objective intake', [
     el('button', {
@@ -74,6 +77,7 @@ export async function render(host, ctx) {
     ].filter(Boolean)),
   ]));
 
+  host.appendChild(deck);
   host.appendChild(el('div', { class: 'cols-2' }, [
     el('div', { class: 'stack' }, [
       notice(
@@ -111,4 +115,100 @@ function kpi(value, label, small) {
   node.appendChild(v);
   node.appendChild(el('div', { class: 'l', text: label }));
   return node;
+}
+
+/**
+ * Command Deck — one-press actions.
+ *
+ * Every button here does something real right now. An action that needs a
+ * runtime KAVI does not have is shown as unavailable with the reason, rather
+ * than as a button that pretends to work. A dead button in a cockpit is worse
+ * than no button.
+ */
+function commandDeck(ctx, summary) {
+  const actions = [
+    {
+      key: 'new-objective',
+      en: 'New objective', id: 'Tujuan baru',
+      hint: { en: 'Create a structured objective', id: 'Buat tujuan terstruktur' },
+      run: () => objectiveForm(ctx),
+    },
+    {
+      key: 'open-decisions',
+      en: 'My decisions', id: 'Keputusan saya',
+      badge: summary.inbox.OPEN || 0,
+      hint: { en: 'Items waiting for you', id: 'Item yang menunggu Anda' },
+      run: () => ctx.navigate('inbox'),
+    },
+    {
+      key: 'open-work',
+      en: 'Open work', id: 'Pekerjaan berjalan',
+      badge: summary.objectives.active || 0,
+      hint: { en: 'Objectives and their tasks', id: 'Tujuan dan pekerjaannya' },
+      run: () => ctx.navigate('objectives'),
+    },
+    {
+      key: 'venture-state',
+      en: 'Venture state', id: 'Status usaha',
+      hint: { en: 'Gate position and evidence', id: 'Posisi gate dan bukti' },
+      run: () => ctx.navigate('ventures'),
+    },
+    {
+      key: 'search-knowledge',
+      en: 'Search knowledge', id: 'Cari pengetahuan',
+      hint: { en: 'Read the canonical vault', id: 'Baca vault kanonik' },
+      run: () => ctx.navigate('memory'),
+    },
+    {
+      key: 'decision-record',
+      en: 'Decision record', id: 'Catatan keputusan',
+      hint: { en: 'What has already been decided', id: 'Apa yang sudah diputuskan' },
+      run: () => ctx.navigate('decisions'),
+    },
+    {
+      key: 'check-limits',
+      en: 'Check limits', id: 'Cek batasan',
+      hint: { en: 'What KAVI may not do', id: 'Yang tidak boleh dilakukan KAVI' },
+      run: () => ctx.navigate('authority'),
+    },
+    {
+      key: 'run-work',
+      en: 'Run work now', id: 'Jalankan sekarang',
+      hint: {
+        en: 'Needs an execution runtime — none is connected',
+        id: 'Butuh runtime eksekusi — belum ada yang terhubung',
+      },
+      disabled: true,
+    },
+  ];
+
+  const grid = el('div', { class: 'deck-grid' });
+  for (const action of actions) {
+    const label = tr('app.close') === 'Tutup' ? action.id : action.en;
+    const hint = tr('app.close') === 'Tutup' ? action.hint.id : action.hint.en;
+
+    const button = el('button', {
+      class: `deck-btn${action.disabled ? ' is-disabled' : ''}`,
+      type: 'button',
+      'data-deck': action.key,
+      title: hint,
+      disabled: action.disabled ? 'disabled' : null,
+      onclick: action.disabled ? null : action.run,
+    }, [
+      el('div', { class: 'deck-row' }, [
+        el('span', { class: 'deck-label', text: label }),
+        action.badge
+          ? el('span', { class: 'deck-badge', text: String(action.badge) })
+          : null,
+      ]),
+      el('span', { class: 'deck-hint', text: hint }),
+    ]);
+    grid.appendChild(button);
+  }
+
+  return panel('Command Deck', [chip(`${actions.filter((a) => !a.disabled).length} ready`, 'mint')],
+    el('div', { class: 'panel-body' }, [
+      grid,
+      el('div', { class: 'deck-foot', text: tr('status.nothingRunning') }),
+    ]));
 }

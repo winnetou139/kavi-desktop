@@ -150,6 +150,11 @@ def body(t) -> None:
         ws.call("Page.enable")
         ws.evaluate("window.__errs = []; window.addEventListener('error', e => window.__errs.push(e.message));")
         ws.call("Page.navigate", url=APP_URL)
+        time.sleep(1.2)
+        # Pin English so a saved language preference from a previous run cannot
+        # make these assertions flap between languages.
+        ws.evaluate("localStorage.setItem('kavi.language','en')")
+        ws.call("Page.navigate", url=APP_URL)
         time.sleep(3.5)
 
         # ------------------------------------------------------------ shell
@@ -168,15 +173,19 @@ def body(t) -> None:
         nav = ws.evaluate(
             "Array.from(document.querySelectorAll('.nav-item')).map(n=>n.innerText.trim().split('\\n')[0])"
         )
-        for expected in ("Command", "CEO Inbox", "Objectives & Tasks", "Ventures",
-                         "Organization", "Memory / Vault", "Metrics & Cost",
-                         "Decision Log", "Authority & Policy"):
+        # The rail shows plain-language names that can be translated, so assert
+        # that all nine modules are present rather than pinning wording.
+        for expected in ("Command", "Decisions for You", "Objectives & Work", "Ventures",
+                         "Organization", "Company Knowledge", "Metrics & Cost",
+                         "Decision Record", "Authority & Limits"):
             t.check(f"rail lists {expected}", expected in nav, str(nav))
         t.equals("rail has exactly nine modules", len(nav), 9)
 
         founder = ws.evaluate("document.querySelector('.rail-foot').innerText.replace(/\\n/g,' ')")
         t.check("founder identity shown", "Founder" in founder, founder)
-        t.check("human authority explicit", "EXPLICIT" in founder, founder)
+        t.check("human approval is required", "REQUIRED" in founder.upper(), founder)
+        t.check("language switch offers both languages",
+                "EN" in founder and "ID" in founder, founder)
 
         # ------------------------------------------------------ each module
         def open_module(key: str) -> str:
@@ -205,16 +214,16 @@ def body(t) -> None:
         t.check("command shows VECYRA venture", "VECYRA" in command_text, command_text[:200])
         t.check("command shows FIXTURE label", "FIXTURE" in command_text)
 
-        t.equals("key 2 opens CEO Inbox", open_module("2"), "CEO Inbox")
+        t.equals("key 2 opens CEO Inbox", open_module("2"), "Decisions for You")
         inbox_text = ws.evaluate("document.querySelector('.inbox-detail').innerText")
-        t.check("inbox shows a recommendation", "RECOMMENDATION" in inbox_text.upper())
+        t.check("inbox shows a recommendation", "RECOMMEND" in inbox_text.upper())
         t.check("inbox shows an evidence trail", "EVIDENCE" in inbox_text.upper())
-        t.check("inbox shows authority note", "AUTHORITY" in inbox_text.upper())
+        t.check("inbox shows authority note", "WHAT THIS ALLOWS" in inbox_text.upper())
         t.check("inbox list populated",
                 ws.evaluate("document.querySelectorAll('.inbox-row').length") >= 4)
 
         # Every item must name the real object it refers to.
-        t.check("inbox item states what it refers to", "REFERS TO" in inbox_text.upper())
+        t.check("inbox item states what it refers to", "THIS IS ABOUT" in inbox_text.upper())
         t.check("inbox resolves a real subject id",
                 ws.evaluate("!!document.querySelector('.subject-ref .mono')"))
 
@@ -232,7 +241,7 @@ def body(t) -> None:
         for category in ("DECISION", "APPROVAL", "RISK", "FYI"):
             t.check(f"inbox category {category} present", category in inbox_all)
 
-        t.equals("key 3 opens Objectives", open_module("3"), "Objectives & Tasks")
+        t.equals("key 3 opens Objectives", open_module("3"), "Objectives & Work")
         t.check("objective cards render",
                 ws.evaluate("document.querySelectorAll('.obj-card').length") >= 1)
         t.check("task board renders columns",
@@ -260,7 +269,7 @@ def body(t) -> None:
         t.check("actor kinds shown", "AGENT_INSTANCE" in org_text and "SERVICE_ACCOUNT" in org_text)
         t.check("provider marked as capability", "PROVIDER" in org_text)
 
-        t.equals("key 6 opens Memory", open_module("6"), "Memory / Vault")
+        t.equals("key 6 opens Memory", open_module("6"), "Company Knowledge")
         t.check("vault notes listed",
                 ws.evaluate("document.querySelectorAll('.vault-row').length") >= 20)
         mem_text = body_text()
@@ -301,13 +310,13 @@ def body(t) -> None:
                 "FIXTURE" in metrics_text.upper() and "LOCAL" in metrics_text.upper())
         t.check("metrics has no fabricated currency", "$" not in metrics_text, metrics_text[:200])
 
-        t.equals("key 8 opens Decision Log", open_module("8"), "Decision Log")
+        t.equals("key 8 opens Decision Log", open_module("8"), "Decision Record")
         decision_text = ws.evaluate("document.querySelector('.screen-body').innerText")
         for decision in ("D-001", "D-002", "D-003", "D-004", "D-005", "D-006"):
             t.check(f"{decision} listed", decision in decision_text)
         t.check("decisions show APPROVED state", "APPROVED" in decision_text)
 
-        t.equals("key 9 opens Authority", open_module("9"), "Authority & Policy")
+        t.equals("key 9 opens Authority", open_module("9"), "Authority & Limits")
         auth_text = ws.evaluate("document.querySelector('.screen-body').innerText")
         # The directive requires all three shown clearly.
         t.check("founder authority shown", "FOUNDER AUTHORITY" in auth_text)
@@ -366,7 +375,7 @@ def body(t) -> None:
                 not ws.evaluate("document.getElementById('modalVeil').classList.contains('on')"))
         t.equals("navigated to Objectives after create",
                  ws.evaluate("document.querySelector('.screen-title').innerText"),
-                 "Objectives & Tasks")
+                 "Objectives & Work")
         objectives_text = ws.evaluate("document.querySelector('.screen-body').innerText")
         t.check("new objective visible in Objectives",
                 "CDP verification objective" in objectives_text, objectives_text[:300])
