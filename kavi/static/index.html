@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAVI — Founder Cockpit</title>
+<link rel="stylesheet" href="/css/kavi.css">
+</head>
+<body>
+<div class="app">
+
+  <div class="titlebar">
+    <div class="tb-logo">
+      <svg class="kmark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M5 3v18" stroke="#00d9a3" stroke-width="2.6" stroke-linecap="round"/>
+        <path d="M18.5 4 8.5 12l10 8" stroke="#f5f5f3" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="tb-title"><b>KAVI</b> — Founder Cockpit</span>
+    </div>
+    <div class="tb-right">
+      <button class="cmdk" id="cmdkBtn" type="button">
+        <span>New objective…</span><kbd>Ctrl K</kbd>
+      </button>
+      <span class="mode-pill" id="modePill">
+        <span class="dot"></span><span>LOCAL MODE / ENGINE ROOM NOT CONNECTED</span>
+      </span>
+      <span id="clock" class="num">--:--:--</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <nav class="rail" id="rail" aria-label="Primary"></nav>
+    <main class="main" id="main"><div class="empty">Loading…</div></main>
+  </div>
+
+  <div class="statusbar" id="statusbar"></div>
+</div>
+
+<div class="palette-veil" id="paletteVeil">
+  <div class="palette" role="dialog" aria-label="Command palette">
+    <div class="palette-in">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00d9a3" stroke-width="2" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>
+      </svg>
+      <input id="paletteInput" placeholder="Jump to a module, or type an objective…" autocomplete="off">
+    </div>
+    <div class="pal-body" id="paletteBody"></div>
+  </div>
+</div>
+
+<div class="modal-veil" id="modalVeil">
+  <div class="modal" role="dialog" aria-label="Dialog">
+    <div class="modal-head"><h3 id="modalTitle">—</h3></div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script type="module" src="/js/main.js"></script>
+</body>
+</html>
