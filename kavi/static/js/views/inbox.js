@@ -1,130 +1,228 @@
-// CEO Inbox — what genuinely requires Founder attention.
+// CEO Inbox — an aggregation of Founder-level items.
+//
+// Every item points at a real underlying object: Objective, Task, Decision,
+// Venture or Approval. This view resolves and displays that reference, and lets
+// the Founder dispose of LOCAL items. Fixture items are decision-locked on
+// purpose: deciding demo data would create a false operational impression.
+//
+// Dispositions update local state only. No external action occurs in v0.1.
+
 import { api } from '../api.js';
-import { el, clear, chip, originChip, panel, toast, valueOr } from '../ui.js';
+import {
+  el, chip, originChip, empty, notice, toast, confirmModal, panel,
+} from '../ui.js';
 
 export const meta = {
   id: 'inbox',
   title: 'CEO Inbox',
-  subtitle: 'Decisions · approvals · risks · opportunities',
+  subtitle: 'Founder-level items · aggregated from real objects',
   group: 'FOUNDER',
   key: '2',
-  icon: ['M3 13h4l2 3h6l2-3h4', 'M4 5h16l1 8v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5l1-8z'],
+  icon: ['M3 7h18v10H3z', 'M3 7l9 6 9-6'],
 };
 
+const TYPE_TONE = {
+  DECISION: 'gold', APPROVAL: 'amber', RISK: 'red',
+  OPPORTUNITY: 'green', FYI: 'muted',
+};
+const RISK_TONE = { HIGH: 'red', MEDIUM: 'amber', LOW: 'muted' };
+const STATE_TONE = {
+  OPEN: 'gold', APPROVED: 'green', REJECTED: 'red',
+  DEFERRED: 'muted', EVIDENCE_REQUESTED: 'amber', ACKNOWLEDGED: 'muted',
+};
+
+const DISPOSITIONS = [
+  ['APPROVED', 'Approve'],
+  ['REJECTED', 'Reject'],
+  ['DEFERRED', 'Defer'],
+  ['EVIDENCE_REQUESTED', 'Ask for evidence'],
+];
+
+let selectedId = null;
+
 export async function render(host, ctx) {
-  const { items, counts } = await api.inbox();
-  ctx.setHeadStats([
-    { v: counts.DECISION || 0, l: 'Decision', tone: 'violet' },
-    { v: counts.APPROVAL || 0, l: 'Approval', tone: 'amber' },
-    { v: counts.RISK || 0, l: 'Risk', tone: counts.RISK ? 'red' : 'muted' },
-    { v: counts.OPEN || 0, l: 'Open', tone: 'mint' },
-  ]);
+  const data = await api.inbox();
+  const items = data.items || [];
+  const counts = data.counts || {};
+
+  host.appendChild(el('div', { class: 'stat-row' }, [
+    stat('OPEN', counts.OPEN ?? 0),
+    stat('DECISION', counts.DECISION ?? 0),
+    stat('APPROVAL', counts.APPROVAL ?? 0),
+    stat('RISK', counts.RISK ?? 0),
+    stat('OPPORTUNITY', counts.OPPORTUNITY ?? 0),
+  ]));
 
   if (!items.length) {
-    host.appendChild(el('div', { class: 'empty' }, [
-      el('b', { text: 'Inbox empty' }),
-      el('div', { text: 'Nothing currently requires Founder attention.' }),
-    ]));
+    host.appendChild(empty(
+      'The inbox is empty.',
+      'Founder-level items appear here when raised from a real Objective, Task, Decision or Venture.',
+    ));
     return;
   }
 
-  const list = el('div', { class: 'inbox-list' });
-  const detail = el('div', { class: 'inbox-detail' });
+  if (!selectedId || !items.some((i) => i.id === selectedId)) selectedId = items[0].id;
 
-  let selected = items[0].id;
+  const detailHost = el('div', { class: 'inbox-detail' });
+  const listHost = el('div', { class: 'inbox-list' });
+
   const draw = () => {
-    clear(list);
-    for (const item of items) {
-      list.appendChild(el('button', {
-        class: `inbox-item ${item.id === selected ? 'sel' : ''}`.trim(),
+    listHost.innerHTML = '';
+    items.forEach((item) => {
+      listHost.appendChild(el('button', {
+        class: `inbox-row${item.id === selectedId ? ' active' : ''}`,
         type: 'button',
-        onclick: () => { selected = item.id; draw(); },
+        'data-inbox-id': item.id,
+        onclick: () => { selectedId = item.id; draw(); drawDetail(); },
       }, [
-        el('div', { class: 'row1' }, [
-          chip(item.type), chip(item.risk), originChip(item.origin),
-        ].filter(Boolean)),
-        el('h4', { text: item.title }),
-        el('div', { class: 'meta', text: `${item.id}${item.objective_id ? ' · ' + item.objective_id : ''}` }),
+        el('div', { class: 'inbox-row-top' }, [
+          chip(item.type, TYPE_TONE[item.type]),
+          chip(item.state, STATE_TONE[item.state]),
+          item.origin === 'FIXTURE' ? originChip('FIXTURE') : null,
+        ]),
+        el('div', { class: 'inbox-row-title', text: item.title }),
+        el('div', { class: 'inbox-row-meta' }, [
+          item.subject_id ? el('span', { class: 'mono', text: item.subject_id }) : null,
+          el('span', { text: (item.created_at || '').slice(0, 10) }),
+        ]),
       ]));
-    }
-    drawDetail(detail, items.find((i) => i.id === selected));
+    });
+  };
+
+  const drawDetail = () => {
+    detailHost.innerHTML = '';
+    const item = items.find((i) => i.id === selectedId);
+    if (item) detailHost.appendChild(detailFor(item, ctx));
   };
 
   draw();
-  host.appendChild(el('div', { class: 'screen-split' }, [list, detail]));
+  drawDetail();
+  host.appendChild(el('div', { class: 'inbox-split' }, [listHost, detailHost]));
 }
 
-function drawDetail(host, item) {
-  clear(host);
-  if (!item) return;
+function detailFor(item, ctx) {
+  const rows = [];
 
-  host.appendChild(el('div', { class: 'detail-kicker' }, [
-    chip(item.type), chip(item.risk), originChip(item.origin),
-  ].filter(Boolean)));
-  host.appendChild(el('div', { class: 'detail-title', text: item.title }));
-  host.appendChild(el('div', {
-    class: 'detail-meta',
-    text: `${item.id}${item.objective_id ? ' · ' + item.objective_id : ''} · ${item.created_at || ''}`,
-  }));
+  rows.push(el('div', { class: 'detail-head' }, [
+    el('div', { class: 'mono muted', text: item.id }),
+    el('h2', { class: 'detail-title', text: item.title }),
+    el('div', { class: 'chip-row' }, [
+      chip(item.type, TYPE_TONE[item.type]),
+      chip(`RISK ${item.risk}`, RISK_TONE[item.risk]),
+      chip(item.state, STATE_TONE[item.state]),
+      item.origin === 'FIXTURE' ? originChip('FIXTURE') : null,
+    ]),
+  ]));
 
-  host.appendChild(section('Recommendation',
-    el('div', { class: 'reco-box', text: item.recommendation || '—' })));
+  // The real underlying object this item refers to.
+  const subject = item.subject;
+  rows.push(el('div', { class: 'detail-block' }, [
+    el('div', { class: 'detail-label', text: 'REFERS TO' }),
+    subject
+      ? el('div', { class: 'subject-ref' }, [
+          chip(subject.kind, 'muted'),
+          el('span', { class: 'mono', text: subject.id }),
+          subject.found
+            ? el('span', { class: 'subject-title', text: subject.title })
+            : el('span', { class: 'subject-missing', text: subject.detail || 'not found' }),
+          subject.found && subject.state ? chip(subject.state, 'muted') : null,
+        ])
+      : notice('This item does not reference an underlying object.', 'warn'),
+  ]));
+
+  if (item.recommendation) {
+    rows.push(block('RECOMMENDATION', el('p', { class: 'detail-text', text: item.recommendation })));
+  }
 
   const evidence = item.evidence || [];
-  const evList = el('div', { class: 'ev-list' });
-  if (!evidence.length) {
-    evList.appendChild(el('div', { class: 'ev' }, [
-      el('span', { class: 'unknown', text: 'NO EVIDENCE ATTACHED' }),
-    ]));
+  if (evidence.length) {
+    rows.push(block(`EVIDENCE (${evidence.length})`, el('div', { class: 'evidence-list' },
+      evidence.map((e) => el('div', { class: 'evidence-row' }, [
+        el('div', { class: 'evidence-head' }, [
+          el('span', { class: 'mono', text: e.id }),
+          chip(e.classification,
+            e.classification === 'FACT' ? 'green' : e.classification === 'UNKNOWN' ? 'red' : 'amber'),
+          e.confidence ? chip(e.confidence, 'muted') : null,
+        ]),
+        el('div', { class: 'evidence-claim', text: e.claim }),
+        e.source ? el('div', { class: 'evidence-source', text: e.source }) : null,
+      ])),
+    )));
   }
-  for (const claim of evidence) {
-    const tone = claim.classification === 'FACT' ? 'mint'
-      : claim.classification === 'INFERENCE' ? 'blue'
-      : claim.classification === 'HYPOTHESIS' ? 'amber' : 'grey';
-    const row = el('div', { class: 'ev' }, [
-      el('span', {
-        class: 'tag',
-        style: `background:var(--${tone}-dim);color:var(--${tone})`,
-        text: claim.classification,
-      }),
-      el('div', {}, [
-        el('div', { text: claim.claim }),
-        el('div', {
-          style: 'margin-top:5px;font-family:var(--mono);font-size:9.5px;color:var(--txt-4)',
-          text: [claim.source, claim.source_date, `confidence ${claim.confidence}`]
-            .filter(Boolean).join(' · '),
-        }),
-        claim.contradiction
-          ? el('span', { class: 'contra', text: `Contradiction: ${claim.contradiction}` })
-          : null,
-      ]),
-    ]);
-    evList.appendChild(row);
-  }
-  host.appendChild(section('Evidence trail', evList));
 
   if (item.authority_note) {
-    host.appendChild(section('Authority condition',
-      el('div', { class: 'reco-box', style: 'border-left-color:var(--amber)', text: item.authority_note })));
+    rows.push(block('AUTHORITY', notice(item.authority_note)));
   }
 
-  const actions = el('div', { class: 'action-row' });
-  for (const [label, cls] of [['Approve', 'primary'], ['Reject', 'danger'], ['Defer', ''], ['Ask Chief of Staff', 'ghost']]) {
-    actions.appendChild(el('button', {
-      class: `btn ${cls}`.trim(),
-      type: 'button',
-      disabled: 'disabled',
-      title: 'Inbox decisioning is not implemented in v0.1. These records are fixture data.',
-      text: label,
-    }));
+  if (item.decided_at) {
+    rows.push(block('DISPOSITION', el('div', {}, [
+      el('div', { class: 'detail-text', text: `${item.state} · ${(item.decided_at || '').slice(0, 16).replace('T', ' ')}` }),
+      item.disposition_note ? el('p', { class: 'detail-text', text: item.disposition_note }) : null,
+    ])));
   }
-  host.appendChild(actions);
-  host.appendChild(el('div', {
-    style: 'margin-top:10px;font-family:var(--mono);font-size:9.5px;color:var(--txt-4);line-height:1.6',
-    text: 'Decisioning is deferred in v0.1. Actions are disabled rather than simulated.',
-  }));
+
+  rows.push(actionsFor(item, ctx));
+  return el('div', { class: 'detail' }, rows);
 }
 
-function section(label, body) {
-  return el('div', { class: 'detail-sec' }, [el('div', { class: 'sl', text: label }), body]);
+function actionsFor(item, ctx) {
+  if (item.origin === 'FIXTURE') {
+    return el('div', { class: 'detail-block' }, [
+      notice(
+        'This is development fixture data and cannot be decided. Raise an item from a real '
+        + 'Objective or Task in Objectives &amp; Tasks to exercise Founder disposition.',
+        'warn',
+      ),
+    ]);
+  }
+  if (!['OPEN', 'DEFERRED', 'EVIDENCE_REQUESTED'].includes(item.state)) {
+    return el('div', { class: 'detail-block' }, [
+      notice(`Closed as ${item.state}. No further action.`),
+    ]);
+  }
+
+  const buttons = DISPOSITIONS
+    .filter(([key]) => key !== item.state)
+    .map(([key, label]) => el('button', {
+      class: key === 'APPROVED' ? 'btn primary' : 'btn ghost',
+      type: 'button',
+      'data-disposition': key,
+      text: label,
+      onclick: async () => {
+        const note = await confirmModal({
+          title: `${label} — ${item.id}`,
+          body: item.title,
+          fieldLabel: 'Reason',
+          confirmLabel: label,
+        });
+        if (note === null) return;
+        try {
+          await api.decideInboxItem(item.id, key, note);
+          toast(`<b>${item.id}</b> → ${key}`);
+          ctx.navigate('inbox');
+        } catch (error) {
+          toast(error.message, 'err');
+        }
+      },
+    }));
+
+  return el('div', { class: 'detail-block' }, [
+    el('div', { class: 'detail-label', text: 'FOUNDER DISPOSITION — LOCAL STATE ONLY' }),
+    el('div', { class: 'btn-row' }, buttons),
+    el('div', { class: 'detail-foot', text: 'No external action is taken. Nothing is sent, executed, or spent.' }),
+  ]);
+}
+
+function block(label, node) {
+  return el('div', { class: 'detail-block' }, [
+    el('div', { class: 'detail-label', text: label }),
+    node,
+  ]);
+}
+
+function stat(label, value) {
+  return el('div', { class: 'stat' }, [
+    el('div', { class: 'stat-value', text: String(value) }),
+    el('div', { class: 'stat-label', text: label }),
+  ]);
 }

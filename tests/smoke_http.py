@@ -68,7 +68,7 @@ def body(t) -> None:
         # -------------------------------------------------------------- api
         status, summary = get(base, "/api/summary")
         t.equals("summary 200", status, 200)
-        t.equals("summary runtime local", summary["runtime"]["mode"], "LOCAL_MODE")
+        t.equals("summary runtime local", summary["runtime"]["mode"], "LOCAL")
 
         status, runtime = get(base, "/api/runtime")
         t.equals("runtime 200", status, 200)

@@ -183,3 +183,35 @@ export function select(name, options, selected) {
   node.addEventListener('keydown', (event) => event.stopPropagation());
   return node;
 }
+
+/**
+ * A modal that asks for a short free-text reason and resolves to that string,
+ * or to null if the Founder cancels. Used for inbox dispositions and task
+ * transitions, where the reason is recorded with the state change.
+ */
+export function confirmModal({ title, body, fieldLabel, confirmLabel, placeholder = '' }) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      closeModal();
+      resolve(value);
+    };
+
+    const area = textarea('reason', placeholder);
+    const wrap = el('div', {}, [
+      body ? el('p', { class: 'modal-note', text: body }) : null,
+      field(fieldLabel || 'Reason', area, 'Recorded with the state change.'),
+    ]);
+
+    openModal(title, wrap, [
+      el('button', { class: 'btn ghost', type: 'button', text: 'Cancel', onclick: () => finish(null) }),
+      el('button', {
+        class: 'btn primary', type: 'button', text: confirmLabel || 'Confirm',
+        onclick: () => finish(area.value.trim()),
+      }),
+    ]);
+    requestAnimationFrame(() => area.focus());
+  });
+}

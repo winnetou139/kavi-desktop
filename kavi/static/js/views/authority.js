@@ -95,12 +95,34 @@ export async function render(host, ctx) {
   }
   providers.appendChild(pbody);
 
+  // The authority ladder A0-A4, and what is actually grantable in LOCAL MODE.
+  const ladder = el('table', { class: 'grid ladder' }, [
+    el('thead', {}, [el('tr', {}, [
+      el('th', { text: 'Level' }), el('th', { text: 'Name' }),
+      el('th', { text: 'Meaning' }), el('th', { text: 'Local mode' }),
+    ])]),
+    el('tbody', {}, (authority.ladder || []).map((row) => el('tr', {
+      class: row.grantable_locally ? '' : 'row-muted',
+      'data-authority-level': row.level,
+    }, [
+      el('td', {}, [el('b', { class: 'mono', text: row.level })]),
+      el('td', {}, [el('b', { text: row.name })]),
+      el('td', { class: 'muted', text: row.detail }),
+      el('td', {}, [chip(row.status, row.grantable_locally ? 'mint' : 'amber')]),
+    ]))),
+  ]);
+
   host.appendChild(el('div', { class: 'stack' }, [
     notice(
-      `<b>HUMAN AUTHORITY — ${authority.human_authority}.</b> ` +
+      `<b>FOUNDER AUTHORITY — ${authority.founder.name}.</b> ` +
+      `<b>HUMAN APPROVAL — ${authority.human_approval}.</b> ` +
+      `<b>${authority.mode}.</b><br>` +
+      `Maximum grantable authority is <b>${authority.max_grantable_level}</b>. ` +
+      'No real execution authority is granted: no runtime is connected.<br>' +
       `Emergency stop: ${authority.emergency_stop.detail}`,
       'amber',
     ),
+    panel('Authority ladder', [chip(authority.mode, 'amber')], ladder),
     el('div', { class: 'cols-2' }, [
       panel('Permission grants', [], grants),
       el('div', { class: 'stack' }, [

@@ -13,6 +13,8 @@ export const meta = {
 
 export async function render(host, ctx) {
   const metrics = await api.metrics();
+  const runtime = await api.runtime();
+  const storage = await api.storage();
   const evidence = metrics.evidence;
 
   ctx.setHeadStats([
@@ -57,7 +59,32 @@ export async function render(host, ctx) {
   }
   recordRows.appendChild(rbody);
 
+  // The Engine Room readout. Every line reports what is actually true.
+  const engineRoom = el('table', { class: 'grid engine-room' }, [
+    el('tbody', {}, (runtime.engine_room_panel || []).map(([label, value]) => el('tr', {}, [
+      el('td', { class: 'er-label', text: label }),
+      el('td', { class: 'er-value' }, [chip(value, toneForRuntime(value))]),
+    ]))),
+  ]);
+
+  const providerRows = el('table', { class: 'grid' }, [
+    el('thead', {}, [el('tr', {}, [
+      el('th', { text: 'Provider' }), el('th', { text: 'Category' }), el('th', { text: 'State' }),
+    ])]),
+    el('tbody', {}, (runtime.providers || []).map((prov) => el('tr', {}, [
+      el('td', {}, [el('b', { text: prov.name })]),
+      el('td', { class: 'muted', text: prov.category }),
+      el('td', {}, [chip(prov.state, 'muted')]),
+    ]))),
+  ]);
+
   host.appendChild(el('div', { class: 'stack' }, [
+    panel('Engine Room', [chip(runtime.label, 'amber')], el('div', { class: 'panel-body' }, [
+      engineRoom,
+      el('div', { class: 'engine-room-note' },
+        (runtime.warnings || []).map((w) => el('div', { text: w }))),
+    ])),
+    panel('Providers', [], providerRows),
     notice(
       '<b>No commercial figure exists.</b> Revenue, cost-to-serve and provider cost are ' +
       'unmeasured in LOCAL MODE. Fixture records must never be counted as company evidence.',
@@ -92,5 +119,23 @@ export async function render(host, ctx) {
       panel('Evidence classification', [], classRows),
       panel('Record origin', [], recordRows),
     ]),
+    panel('Where state is stored', [], el('div', { class: 'panel-body' }, [
+      kv([
+        ['Local operational store', storage.operational_store.path],
+        ['Format', storage.operational_store.format],
+        ['Canonical for', storage.operational_store.canonical_for],
+        ['Canonical vault', storage.canonical_vault.path || 'NOT LOCATED'],
+        ['Vault canonical for', storage.canonical_vault.canonical_for],
+        ['Vault access', storage.canonical_vault.access || 'READ ONLY'],
+      ]),
+      notice(storage.separation_rule),
+    ])),
   ]));
+}
+
+function toneForRuntime(value) {
+  const v = String(value).toUpperCase();
+  if (v.includes('NOT CONNECTED') || v.includes('NOT ACTIVE')) return 'amber';
+  if (v.includes('UNAVAILABLE') || v.includes('NOT MEASURED')) return 'amber';
+  return 'muted';
 }

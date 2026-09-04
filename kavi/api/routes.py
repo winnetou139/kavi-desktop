@@ -112,6 +112,22 @@ def build_router(service: CockpitService) -> Router:
     def inbox(query: dict[str, Any], body: dict[str, Any]) -> Any:
         return {"items": service.list_inbox(), "counts": service.inbox_counts()}
 
+    @router.post("/api/inbox/create")
+    def create_inbox(query: dict[str, Any], body: dict[str, Any]) -> Any:
+        return service.create_inbox_item(body)
+
+    @router.post("/api/inbox/decide")
+    def decide_inbox(query: dict[str, Any], body: dict[str, Any]) -> Any:
+        return service.decide_inbox_item(
+            str(body.get("id", "")),
+            str(body.get("disposition", "")),
+            note=str(body.get("note", "")),
+        )
+
+    @router.get("/api/storage")
+    def storage(query: dict[str, Any], body: dict[str, Any]) -> Any:
+        return service.storage_info()
+
     # ------------------------------------------------------------ ventures
 
     @router.get("/api/ventures")

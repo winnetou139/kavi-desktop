@@ -26,6 +26,7 @@ NAMESPACES = {
     "actor": "ACT",
     "venture": "VEN",
     "memory": "MEM",
+    "inbox": "INB",
 }
 
 _lock = threading.Lock()

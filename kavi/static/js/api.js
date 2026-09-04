@@ -27,6 +27,7 @@ export const api = {
   summary: () => request('GET', '/api/summary'),
   runtime: () => request('GET', '/api/runtime'),
   authority: () => request('GET', '/api/authority'),
+  storage: () => request('GET', '/api/storage'),
 
   objectives: () => request('GET', '/api/objectives'),
   objective: (id) => request('GET', `/api/objective${qs({ id })}`),
@@ -40,6 +41,10 @@ export const api = {
   dispatchTask: (id) => request('POST', '/api/tasks/dispatch', { id }),
 
   inbox: () => request('GET', '/api/inbox'),
+  createInboxItem: (payload) => request('POST', '/api/inbox/create', payload),
+  decideInboxItem: (id, disposition, note) =>
+    request('POST', '/api/inbox/decide', { id, disposition, note }),
+
   ventures: () => request('GET', '/api/ventures'),
   venture: (id) => request('GET', `/api/venture${qs({ id })}`),
   organization: () => request('GET', '/api/organization'),

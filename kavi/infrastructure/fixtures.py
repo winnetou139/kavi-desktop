@@ -155,8 +155,37 @@ def ventures() -> list[dict[str, Any]]:
             "gate_status": "NOT PASSED",
             "recommendation": "INVESTIGATE",
             "problem": "Contemporaneous delay and disruption evidence capture that survives EOT scrutiny",
-            "segment": "MEP / electrical specialty subcontractors, 20–199 employees",
+            "segment": "MEP / electrical specialty subcontractors, 20–499 employees",
             "commercial_evidence": "UNKNOWN / REQUIRES VALIDATION",
+            "hypotheses": [
+                "Specialist subcontractors lose EOT/claim entitlement because delay evidence "
+                "is not captured contemporaneously.",
+                "The budget owner in a 20–499 employee electrical firm is reachable without "
+                "enterprise procurement.",
+                "Existing tooling does not serve this segment at a price it will pay.",
+            ],
+            "known_evidence": [
+                "Distressed-project disputes average US$56.0m and 12.2 months (Arcadis 16th CDR).",
+                "Across 2,204 projects / $2.43tn CapEx, 33.4% of budgets and 65.8% of schedules "
+                "were exceeded (HKA CRUX 8th).",
+                "'Where there is no contemporary record to support a claim, that claim fails' "
+                "(AG Falkland Islands v Gordon Forbes).",
+                "7,925 US electrical contracting firms sit in the 20–499 employee band (Census SUSB 2022).",
+            ],
+            "unknowns": [
+                "U1 — Willingness to pay. No signal of any kind.",
+                "U2 — Who signs, and at what approval threshold.",
+                "U3 — Whether the problem is felt acutely enough to fund.",
+                "U4 — Whether the segment is reachable without enterprise procurement.",
+                "U5 — Realistic price floor; the observed floor is ~$6k/yr, not $2k.",
+                "U6 — Competitor traction in this specific segment.",
+                "U7 — SCL and AACE primary texts were never retrieved.",
+                "U8 — Whether GCs, not trades, are the real buyer.",
+            ],
+            "next_validation": (
+                "10–15 structured problem interviews with MEP/electrical subcontractors. "
+                "No pitching. Founder approval required before any external contact."
+            ),
             "blockers": (
                 "No buyer-side evidence. No willingness-to-pay signal. "
                 "Segment depth thin. Counter-evidence locates the spreadsheet "
@@ -188,7 +217,13 @@ def objectives() -> list[dict[str, Any]]:
             "owner_actor_id": "ACT-2026-002",
             "sponsor_actor_id": "ACT-2026-001",
             "permission_grant_id": "GNT-2026-001",
+            "priority": "HIGH",
+            "authority_level": "A1",
             "constraints": "Desk research only. No outreach. No spend. No product code changes.",
+            "success_criteria": (
+                "One problem, one segment, an evidence table with every material claim "
+                "classified, and a gate recommendation the Founder can act on."
+            ),
             "evidence_requirements": "Every material claim classified with source, date, locator, confidence, freshness, contradiction.",
             "budget": "0 external spend",
             "actual_cost": "0 external spend",
@@ -209,9 +244,16 @@ def tasks() -> list[dict[str, Any]]:
         "assigned_role_id": "ACT-2026-003",
         "permission_grant_id": "GNT-2026-001",
         "capability_requirements": "REASONING, WEB_READ",
+        "authority_level": "A1",
+        "priority": "NORMAL",
+        "evidence_requirement": "Every material claim classified with source, date, locator, confidence.",
+        "review_required": True,
+        "approval_required": False,
         "estimated_cost": "0 external spend",
         "actual_cost": "0 external spend",
         "retry_policy": "no retry; single bounded run",
+        "created_at": "2026-09-04T21:00:00",
+        "updated_at": "2026-09-04T22:20:00",
         "origin": FIXTURE,
     }
     return [
@@ -283,6 +325,9 @@ def tasks() -> list[dict[str, Any]]:
             "id": "TASK-2026-007",
             "title": "Customer interviews — MEP subcontractors",
             "state": "BLOCKED",
+            "priority": "HIGH",
+            "depends_on": "TASK-2026-006",
+            "approval_required": True,
             "permission_grant_id": "GNT-2026-004",
             "expected_output": "10–15 structured problem interviews",
             "idempotency_key": "obj001-interviews",
@@ -497,16 +542,24 @@ def decisions() -> list[dict[str, Any]]:
 
 
 def inbox() -> list[dict[str, Any]]:
+    """Fixture inbox items.
+
+    Each references a real underlying object so the aggregation semantics are
+    demonstrated correctly. They remain FIXTURE and cannot be decided; create a
+    local item from a real object to exercise Founder disposition.
+    """
     return [
         {
             "id": "INB-2026-001",
             "type": "DECISION",
             "risk": "MEDIUM",
             "title": "VECYRA problem and segment selection",
+            "subject_kind": "OBJECTIVE",
+            "subject_id": "OBJ-2026-001",
             "objective_id": "OBJ-2026-001",
             "recommendation": (
                 "Recommend contemporaneous delay-evidence capture for MEP/electrical "
-                "subcontractors of 20–199 employees. Gate recommendation: REMAIN IN VALIDATE."
+                "subcontractors. Gate recommendation: REMAIN IN VALIDATE."
             ),
             "evidence_ids": ["CLM-2026-001", "CLM-2026-002", "CLM-2026-003", "CLM-2026-005", "CLM-2026-006"],
             "authority_note": (
@@ -514,6 +567,8 @@ def inbox() -> list[dict[str, Any]]:
                 "advance the gate; Founder approval required."
             ),
             "state": "OPEN",
+            "disposition_note": "",
+            "decided_at": "",
             "created_at": "2026-09-04T22:20:00",
             "origin": FIXTURE,
         },
@@ -522,14 +577,18 @@ def inbox() -> list[dict[str, Any]]:
             "type": "APPROVAL",
             "risk": "MEDIUM",
             "title": "Authorize customer interviews (external contact)",
+            "subject_kind": "TASK",
+            "subject_id": "TASK-2026-007",
             "objective_id": "OBJ-2026-001",
             "recommendation": (
-                "Approve 10–15 structured problem interviews per the Validation Protocol. "
-                "No pitching. Blocked until approved."
+                "Approve 10-15 structured problem interviews per the Validation Protocol. "
+                "No pitching. The task is BLOCKED until approved."
             ),
             "evidence_ids": ["CLM-2026-007"],
             "authority_note": "First external contact. Founder-reserved. Approval APR-2026-001 pending.",
             "state": "OPEN",
+            "disposition_note": "",
+            "decided_at": "",
             "created_at": "2026-09-04T22:21:00",
             "origin": FIXTURE,
         },
@@ -538,6 +597,8 @@ def inbox() -> list[dict[str, Any]]:
             "type": "RISK",
             "risk": "HIGH",
             "title": "Counter-evidence contradicts the recommended segment",
+            "subject_kind": "VENTURE",
+            "subject_id": "VEN-2026-001",
             "objective_id": "OBJ-2026-001",
             "recommendation": (
                 "Dodge/CMiC locates the project-controls spreadsheet problem in GCs (77%), "
@@ -546,6 +607,8 @@ def inbox() -> list[dict[str, Any]]:
             "evidence_ids": ["CLM-2026-005"],
             "authority_note": "Contradiction preserved, not discarded. Founder judgement required.",
             "state": "OPEN",
+            "disposition_note": "",
+            "decided_at": "",
             "created_at": "2026-09-04T22:21:30",
             "origin": FIXTURE,
         },
@@ -554,11 +617,15 @@ def inbox() -> list[dict[str, Any]]:
             "type": "FYI",
             "risk": "LOW",
             "title": "Foundation Hardening passed independent review",
+            "subject_kind": "DECISION",
+            "subject_id": "D-005",
             "objective_id": "",
             "recommendation": "Four foundational contracts are canonical at v0.2. Zero blockers.",
             "evidence_ids": [],
             "authority_note": "No action required.",
             "state": "OPEN",
+            "disposition_note": "",
+            "decided_at": "",
             "created_at": "2026-09-04T21:58:00",
             "origin": FIXTURE,
         },

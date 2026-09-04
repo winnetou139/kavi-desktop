@@ -13,6 +13,18 @@ import * as decisions from './views/decisions.js';
 import * as authority from './views/authority.js';
 
 const VIEWS = [command, inbox, objectives, ventures, organization, memory, metrics, decisions, authority];
+const RAIL_GROUPS = ['FOUNDER', 'WORK', 'COMPANY'];
+
+// A module whose group is not a real rail group would silently vanish from the
+// navigation. Fail loudly instead: a missing cockpit module is never acceptable.
+for (const view of VIEWS) {
+  if (!RAIL_GROUPS.includes(view.meta.group)) {
+    throw new Error(
+      `Module "${view.meta.id}" declares unknown rail group "${view.meta.group}". `
+      + `Valid groups: ${RAIL_GROUPS.join(', ')}.`,
+    );
+  }
+}
 const BY_ID = Object.fromEntries(VIEWS.map((v) => [v.meta.id, v]));
 const BY_KEY = Object.fromEntries(VIEWS.map((v) => [v.meta.key, v.meta.id]));
 
@@ -36,7 +48,7 @@ let pendingActions = [];
 
 function drawRail() {
   clear(railHost);
-  const groups = ['FOUNDER', 'WORK', 'COMPANY'];
+  const groups = RAIL_GROUPS;
   for (const group of groups) {
     railHost.appendChild(el('div', { class: 'rail-sec', text: group }));
     for (const view of VIEWS.filter((v) => v.meta.group === group)) {
@@ -96,6 +108,8 @@ function drawStatusbar(runtime) {
     el('b', { class: 'off', text: value }),
   ]);
   bar.appendChild(el('span', { class: 'wr', text: '◐ ' + runtime.label }));
+  bar.appendChild(el('span', { class: 'sep' }));
+  bar.appendChild(off('VPS', runtime.vps));
   bar.appendChild(el('span', { class: 'sep' }));
   bar.appendChild(off('SCHEDULER', runtime.scheduler));
   bar.appendChild(el('span', { class: 'sep' }));

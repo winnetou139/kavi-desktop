@@ -16,20 +16,35 @@ from kavi.application.services import UseCaseError  # noqa: E402
 from kavi.container import build_service  # noqa: E402
 
 
-def body(t) -> None:
+def body_core(t) -> None:
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="kavi-test-")) / "kavi.json"
     service = build_service(data_path=tmp)
     router = build_router(service)
 
     # ------------------------------------------------------------ runtime
     runtime = service.runtime_status()
-    t.equals("runtime mode is LOCAL", runtime["mode"], "LOCAL_MODE")
+    # Vocabulary per the Founder directive: MODE LOCAL, QUEUE LOCAL / NOT ACTIVE,
+    # COST LOCAL / FIXTURE / UNAVAILABLE. The guarantee under test is not the
+    # exact wording but that nothing is ever reported as a measured quantity.
+    t.equals("runtime mode is LOCAL", runtime["mode"], "LOCAL")
     t.equals("engine room not connected", runtime["engine_room"], "ENGINE_ROOM_NOT_CONNECTED")
     t.equals("uptime not measured", runtime["uptime"], "NOT MEASURED")
-    t.equals("cost not measured", runtime["cost_today"], "NOT MEASURED")
-    t.equals("queue not measured", runtime["queue_depth"], "NOT MEASURED")
+    t.check("cost is not a measured figure",
+            runtime["cost_today"] in ("NOT MEASURED", "LOCAL / UNAVAILABLE")
+            or "UNAVAILABLE" in runtime["cost_today"])
+    t.check("queue is not a measured figure",
+            runtime["queue_depth"] in ("NOT MEASURED", "LOCAL / NOT ACTIVE"))
     t.equals("router not connected", runtime["router"], "NOT CONNECTED")
     t.equals("vault sync not connected", runtime["vault_sync"], "NOT CONNECTED")
+
+    # No runtime telemetry field may ever carry a bare number. A digit here
+    # would mean the cockpit had begun inventing operational data.
+    import re as _re
+    for _field in ("uptime", "cost_today", "queue_depth", "queue", "cost", "vps",
+                   "scheduler", "provider_router", "router", "vault_sync"):
+        _value = str(runtime.get(_field, ""))
+        t.check(f"{_field} reports no fabricated number",
+                not _re.search(r"\d", _value))
     t.check("no provider claims to be online",
             all(p["state"] == "NOT CONNECTED" for p in runtime["providers"]))
     t.equals("execution adapter not connected", runtime["execution"]["connected"], False)
@@ -199,7 +214,7 @@ def body(t) -> None:
     handler = router.resolve("GET", "/api/summary")
     payload = handler({}, {})
     t.check("summary carries vocabularies", "vocabularies" in payload)
-    t.check("summary carries runtime", payload["runtime"]["mode"] == "LOCAL_MODE")
+    t.check("summary carries runtime", payload["runtime"]["mode"] == "LOCAL")
     t.check("summary is JSON serializable", isinstance(json.dumps(payload), str))
 
     # ------------------------------------------------------- persistence
@@ -218,4 +233,181 @@ def body(t) -> None:
             len(clean.list_objectives()) >= 1)
 
 
-main("smoke_application", body)
+
+
+# --------------------------------------------------- functionalization v0.1
+
+
+def body_functionalization(t):
+    """The workflows the Founder directive requires to be genuinely real."""
+    import pathlib
+    import tempfile
+
+    from kavi.container import build_service
+
+    store = pathlib.Path(tempfile.mkdtemp()) / "kavi.json"
+    s = build_service(data_path=store)
+
+    # --- Objectives are real: created, identified, persisted, restored.
+    created = s.create_objective({
+        "title": "Validate VECYRA progress reconciliation opportunity.",
+        "outcome": "A decision-ready recommendation.",
+        "priority": "HIGH",
+        "authority_level": "A1",
+        "success_criteria": "One problem, one segment, evidence table.",
+        "evidence_requirements": "Every claim classified.",
+        "budget": "0 external spend",
+        "state": "ACTIVE",
+    })
+    t.check("objective gets a stable namespaced id", created["id"].startswith("OBJ-"))
+    t.check("objective persists priority", created["priority"] == "HIGH")
+    t.check("objective persists success criteria", created["success_criteria"] != "")
+    t.check("objective persists authority level", created["authority_level"] == "A1")
+    t.check("objective is local origin", created["origin"] == "LOCAL")
+    t.check("objective reached ACTIVE", created["state"] == "ACTIVE")
+
+    reopened = build_service(data_path=store)
+    ids = [o["id"] for o in reopened.list_objectives()]
+    t.check("objective survives restart", created["id"] in ids)
+
+    # --- Tasks are real records with kernel fields.
+    task_a = reopened.create_task({
+        "objective_id": created["id"],
+        "title": "Collect market structure evidence",
+        "expected_output": "Evidence table",
+        "evidence_requirement": "Source + date + locator",
+        "priority": "HIGH",
+        "review_required": True,
+    })
+    task_b = reopened.create_task({
+        "objective_id": created["id"],
+        "title": "Independent review",
+        "depends_on": task_a["id"],
+        "approval_required": True,
+    })
+    t.check("task gets a namespaced id", task_a["id"].startswith("TASK-"))
+    t.check("task starts in BACKLOG", task_a["state"] == "BACKLOG")
+    t.check("task keeps review requirement", task_a["review_required"] is True)
+    t.check("task keeps approval requirement", task_b["approval_required"] is True)
+    t.check("task records dependency", task_b["depends_on"] == task_a["id"])
+
+    # --- Dependencies are enforced, not decorative.
+    reopened.transition_task(task_b["id"], "READY")
+    try:
+        reopened.transition_task(task_b["id"], "RUNNING")
+        t.check("dependency blocks a premature start", False)
+    except Exception as exc:
+        t.check("dependency blocks a premature start", "DONE" in str(exc))
+
+    # --- A task moves through valid states only.
+    reopened.transition_task(task_a["id"], "READY")
+    reopened.transition_task(task_a["id"], "RUNNING")
+    moved = reopened.transition_task(task_a["id"], "REVIEW")
+    t.check("task moved BACKLOG->READY->RUNNING->REVIEW", moved["state"] == "REVIEW")
+    try:
+        reopened.transition_task(task_a["id"], "BACKLOG")
+        t.check("invalid task transition refused", False)
+    except Exception:
+        t.check("invalid task transition refused", True)
+
+    # --- Unknown dependency is refused at creation.
+    try:
+        reopened.create_task({
+            "objective_id": created["id"], "title": "x", "depends_on": "TASK-9999-999",
+        })
+        t.check("unknown dependency refused", False)
+    except Exception:
+        t.check("unknown dependency refused", True)
+
+    # --- CEO Inbox aggregates real objects.
+    item = reopened.create_inbox_item({
+        "subject_kind": "OBJECTIVE",
+        "subject_id": created["id"],
+        "type": "DECISION",
+        "risk": "MEDIUM",
+        "recommendation": "Approve the interview experiment.",
+    })
+    t.check("inbox item gets a namespaced id", item["id"].startswith("INB-"))
+    t.check("inbox item references the objective", item["subject_id"] == created["id"])
+    t.check("inbox subject resolves to a real record",
+            item["subject"] is not None and item["subject"]["found"] is True)
+
+    try:
+        reopened.create_inbox_item({"type": "FYI", "title": "floating"})
+        t.check("decorative local inbox item refused", False)
+    except Exception:
+        t.check("decorative local inbox item refused", True)
+
+    try:
+        reopened.create_inbox_item({
+            "subject_kind": "OBJECTIVE", "subject_id": "OBJ-9999-999", "type": "FYI",
+        })
+        t.check("inbox item on a missing object refused", False)
+    except Exception:
+        t.check("inbox item on a missing object refused", True)
+
+    # --- Founder disposition updates local state and survives restart.
+    decided = reopened.decide_inbox_item(item["id"], "APPROVED", note="Proceed.")
+    t.check("inbox disposition applied", decided["state"] == "APPROVED")
+    t.check("inbox disposition records a reason", decided["disposition_note"] == "Proceed.")
+    t.check("inbox disposition timestamped", decided["decided_at"] != "")
+
+    again = build_service(data_path=store)
+    persisted = [i for i in again.list_inbox() if i["id"] == item["id"]][0]
+    t.check("inbox disposition survives restart", persisted["state"] == "APPROVED")
+
+    # --- Fixture inbox items cannot be decided.
+    fixture_items = [i for i in again.list_inbox() if i["origin"] == "FIXTURE"]
+    t.check("fixture inbox items exist for demonstration", len(fixture_items) > 0)
+    try:
+        again.decide_inbox_item(fixture_items[0]["id"], "APPROVED")
+        t.check("fixture inbox item cannot be decided", False)
+    except Exception:
+        t.check("fixture inbox item cannot be decided", True)
+
+    # --- Every fixture inbox item still references a real object.
+    for fixture in fixture_items:
+        t.check(
+            f"fixture inbox {fixture['id']} references a real object",
+            fixture["subject"] is not None and fixture["subject"]["found"] is True,
+        )
+
+    # --- Engine Room reports exactly what the directive requires.
+    panel = dict(again.runtime_status()["engine_room_panel"])
+    t.check("engine room reports MODE LOCAL", panel["MODE"] == "LOCAL")
+    t.check("engine room reports VPS NOT CONNECTED", panel["VPS"] == "NOT CONNECTED")
+    t.check("engine room reports RUNTIME LOCAL DEVELOPMENT", panel["RUNTIME"] == "LOCAL DEVELOPMENT")
+    t.check("engine room reports SCHEDULER not connected", "NOT CONNECTED" in panel["SCHEDULER"])
+    t.check("engine room reports QUEUE not active", "NOT ACTIVE" in panel["QUEUE"])
+    t.check("engine room reports ROUTER not connected", panel["PROVIDER ROUTER"] == "NOT CONNECTED")
+    t.check("engine room reports VAULT local", panel["VAULT"] == "LOCAL")
+    t.check("engine room reports COST unavailable", "UNAVAILABLE" in panel["COST"])
+
+    # --- Authority ladder is A0-A4, and A3/A4 are not grantable locally.
+    ladder = again.authority_summary()["ladder"]
+    t.check("authority ladder has five levels", len(ladder) == 5)
+    t.check("ladder covers A0..A4",
+            [row["level"] for row in ladder] == ["A0", "A1", "A2", "A3", "A4"])
+    not_grantable = [row["level"] for row in ladder if not row["grantable_locally"]]
+    t.check("A3 and A4 are not grantable in local mode", not_grantable == ["A3", "A4"])
+    t.check("max grantable is A2", again.authority_summary()["max_grantable_level"] == "A2")
+
+    # --- Storage location is reported and the two stores stay separate.
+    info = again.storage_info()
+    t.check("operational store path is reported", info["operational_store"]["path"].endswith(".json"))
+    t.check("operational store exists after writes", info["operational_store"]["exists"] is True)
+    t.check("vault is described separately", "canonical_for" in info["canonical_vault"])
+    t.check("separation rule is stated", "not merged" in info["separation_rule"])
+    t.check(
+        "vault and operational store are different locations",
+        info["canonical_vault"].get("path") != info["operational_store"]["path"],
+    )
+
+
+def body(t):
+    body_core(t)
+    body_functionalization(t)
+
+
+if __name__ == "__main__":
+    main("smoke_application", body)

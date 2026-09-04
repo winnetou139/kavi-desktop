@@ -14,6 +14,7 @@ SUITES = (
     "tests/smoke_architecture.py",
     "tests/smoke_http.py",
     "tests/smoke_ui_cdp.py",
+    "tests/acceptance_v01.py",
 )
 
 

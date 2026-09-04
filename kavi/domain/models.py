@@ -134,10 +134,13 @@ class Objective(_Base):
     title: str
     outcome: str = ""
     state: str = "DRAFT"
+    priority: str = "NORMAL"
     owner_actor_id: str = ""
     sponsor_actor_id: str = ""
+    authority_level: str = "A0"
     permission_grant_id: str = ""
     constraints: str = ""
+    success_criteria: str = ""
     evidence_requirements: str = ""
     budget: str = ""
     actual_cost: str = ""
@@ -150,7 +153,15 @@ class Objective(_Base):
     def __post_init__(self) -> None:
         self.title = _require(self.title, "objective.title")
         _require_in(self.state, states.OBJECTIVE_STATES, "objective.state")
+        _require_in(self.priority, states.PRIORITY_LEVELS, "objective.priority")
+        _require_in(self.authority_level, tuple(states.AUTHORITY_LEVELS), "objective.authority_level")
         _require_in(self.origin, ORIGINS, "objective.origin")
+        if not states.AUTHORITY_LEVELS[self.authority_level]["grantable_locally"]:
+            raise ValueError(
+                f"authority {self.authority_level} "
+                f"({states.AUTHORITY_LEVELS[self.authority_level]['name']}) cannot be granted "
+                "in LOCAL MODE — no execution runtime is connected"
+            )
 
     def transition(self, target: str) -> None:
         states.check_objective_transition(self.state, target)
@@ -167,18 +178,26 @@ class Task(_Base):
     objective_id: str
     title: str
     state: str = "BACKLOG"
+    priority: str = "NORMAL"
     parent_task_id: str = ""
+    depends_on: str = ""
     owner_actor_id: str = ""
     assignee_actor_id: str = ""
     assigned_role_id: str = ""
+    authority_level: str = "A0"
     permission_grant_id: str = ""
     capability_requirements: str = ""
     expected_output: str = ""
+    evidence_requirement: str = ""
+    review_required: bool = False
+    approval_required: bool = False
     estimated_cost: str = ""
     actual_cost: str = ""
     idempotency_key: str = ""
     retry_policy: str = ""
     failure_reason: str = ""
+    created_at: str = dataclasses.field(default_factory=_now)
+    updated_at: str = dataclasses.field(default_factory=_now)
     started_at: str = ""
     completed_at: str = ""
     origin: str = "LOCAL"
@@ -187,11 +206,28 @@ class Task(_Base):
         self.objective_id = _require(self.objective_id, "task.objective_id")
         self.title = _require(self.title, "task.title")
         _require_in(self.state, states.TASK_STATES, "task.state")
+        _require_in(self.priority, states.PRIORITY_LEVELS, "task.priority")
+        _require_in(self.authority_level, tuple(states.AUTHORITY_LEVELS), "task.authority_level")
         _require_in(self.origin, ORIGINS, "task.origin")
+        if not states.AUTHORITY_LEVELS[self.authority_level]["grantable_locally"]:
+            raise ValueError(
+                f"authority {self.authority_level} cannot be granted in LOCAL MODE"
+            )
 
     def transition(self, target: str, *, reason: str = "") -> None:
         states.check_task_transition(self.state, target)
+        target = target.upper()
+        # A task that must be reviewed cannot bypass REVIEW on the way to DONE.
+        if target == "DONE" and self.review_required and self.state != "APPROVAL":
+            raise states.TransitionError(
+                "this task requires review and approval before it can be completed"
+            )
+        if target == "APPROVAL" and not (self.approval_required or self.review_required):
+            raise states.TransitionError(
+                "this task declares no approval requirement; move it to DONE via REVIEW instead"
+            )
         self.state = target
+        self.updated_at = _now()
         if target == "RUNNING" and not self.started_at:
             self.started_at = _now()
         if states.is_terminal_task_state(target):
@@ -202,6 +238,10 @@ class Task(_Base):
     @property
     def is_terminal(self) -> bool:
         return states.is_terminal_task_state(self.state)
+
+    @property
+    def dependency_ids(self) -> list[str]:
+        return [part.strip() for part in self.depends_on.split(",") if part.strip()]
 
 
 # ------------------------------------------------------------------ Evidence
@@ -396,7 +436,61 @@ class Venture(_Base):
         _require_in(self.origin, ORIGINS, "venture.origin")
 
 
-# ------------------------------------------------------------- MemoryRecord
+# ----------------------------------------------------------- InboxItem
+
+
+@dataclasses.dataclass
+class InboxItem(_Base):
+    """A Founder-level item that must reference a real underlying object.
+
+    The CEO Inbox is an aggregation, not a record store of its own. Every item
+    points at an Objective, Task, Decision, Venture or Approval. Standalone
+    decorative items are only permitted when explicitly marked FIXTURE.
+    """
+
+    id: str
+    type: str
+    title: str
+    subject_kind: str = ""      # OBJECTIVE | TASK | DECISION | VENTURE | APPROVAL
+    subject_id: str = ""
+    risk: str = "LOW"
+    state: str = "OPEN"
+    recommendation: str = ""
+    authority_note: str = ""
+    evidence_ids: list = dataclasses.field(default_factory=list)
+    objective_id: str = ""
+    disposition_note: str = ""
+    decided_at: str = ""
+    created_at: str = dataclasses.field(default_factory=_now)
+    origin: str = "LOCAL"
+
+    SUBJECT_KINDS = ("OBJECTIVE", "TASK", "DECISION", "VENTURE", "APPROVAL", "")
+
+    def __post_init__(self) -> None:
+        self.title = _require(self.title, "inbox.title")
+        _require_in(self.type, states.INBOX_TYPES, "inbox.type")
+        _require_in(self.state, states.INBOX_STATES, "inbox.state")
+        _require_in(self.risk, ("LOW", "MEDIUM", "HIGH"), "inbox.risk")
+        _require_in(self.subject_kind, self.SUBJECT_KINDS, "inbox.subject_kind")
+        _require_in(self.origin, ORIGINS, "inbox.origin")
+        if self.origin == "LOCAL" and not (self.subject_kind and self.subject_id):
+            raise ValueError(
+                "a local inbox item must reference a real underlying object "
+                "(subject_kind + subject_id); decorative items are fixture-only"
+            )
+
+    def decide(self, target: str, *, note: str = "") -> None:
+        states.check_inbox_transition(self.state, target.upper())
+        self.state = target.upper()
+        self.disposition_note = note or self.disposition_note
+        self.decided_at = _now()
+
+    @property
+    def is_open(self) -> bool:
+        return self.state in ("OPEN", "DEFERRED", "EVIDENCE_REQUESTED")
+
+
+# ----------------------------------------------------------- MemoryRecord
 
 
 @dataclasses.dataclass

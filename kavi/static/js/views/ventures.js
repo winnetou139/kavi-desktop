@@ -50,17 +50,32 @@ export async function render(host, ctx) {
           ['Current stage', chip(venture.stage)],
           ['Current gate', venture.gate],
           ['Gate status', chip(venture.gate_status)],
-          ['Recommendation', chip(venture.recommendation)],
+          ['Gate recommendation', chip(venture.recommendation)],
           ['Problem', venture.problem],
           ['Segment', venture.segment],
           ['Commercial evidence', venture.commercial_evidence],
-          ['Blockers', venture.blockers],
-          ['Next gate requirement', venture.next_gate_requirement],
+          ['Next required validation', venture.next_validation],
           ['Next Founder decision', venture.next_founder_decision],
         ]),
+        bullets('HYPOTHESES', venture.hypotheses, 'mint'),
+        bullets('KNOWN EVIDENCE', venture.known_evidence, 'mint'),
+        bullets('UNKNOWNS — REQUIRES VALIDATION', venture.unknowns, 'amber'),
+        bullets('BLOCKERS', venture.blockers ? [venture.blockers] : [], 'red'),
+        el('div', { class: 'detail-label', style: 'margin-top:14px', text: 'NEXT GATE REQUIREMENT' }),
+        el('div', { class: 'detail-text', text: venture.next_gate_requirement || '—' }),
       ]),
     ])));
   }
 
   host.appendChild(stack);
+}
+
+/** A labelled bullet list, omitted entirely when there is nothing to show. */
+function bullets(label, items, tone) {
+  if (!items || !items.length) return null;
+  return el('div', { class: 'venture-bullets', 'data-group': label }, [
+    el('div', { class: 'detail-label', text: label }),
+    el('ul', { class: `bullet-list tone-${tone}` },
+      items.map((item) => el('li', { text: item }))),
+  ]);
 }

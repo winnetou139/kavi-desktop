@@ -151,4 +151,90 @@ class VaultReader:
             "document_state": (front.get("status", "active") or "active").upper(),
             "content": text,
             "access": "READ ONLY",
+            "links": self.outgoing_links(relative_path, text),
+            "backlinks": self.backlinks(target.stem),
         }
+
+    def outgoing_links(self, relative_path: str, text: str | None = None) -> list[dict[str, Any]]:
+        """Wikilinks in a note, resolved to real vault paths where possible."""
+        if not self.available:
+            return []
+        assert self.root is not None
+        if text is None:
+            target = (self.root / relative_path)
+            if not target.is_file():
+                return []
+            text = target.read_text(encoding="utf-8")
+        prose = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+        prose = re.sub(r"`[^`]*`", "", prose)
+        by_stem = {note["title"]: note for note in self.index()}
+        by_basename = {
+            pathlib.PurePath(note["path"]).stem: note for note in self.index()
+        }
+        seen: set[str] = set()
+        out: list[dict[str, Any]] = []
+        for raw in _WIKILINK.findall(prose):
+            name = raw.split("|")[0].split("#")[0].strip()
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            stem = pathlib.PurePath(name.replace("\\", "/")).stem
+            match = by_basename.get(stem) or by_stem.get(name)
+            out.append({
+                "name": name,
+                "path": match["path"] if match else "",
+                "resolved": bool(match),
+            })
+        return out
+
+    def backlinks(self, note_stem: str) -> list[dict[str, Any]]:
+        """Notes that link to this one."""
+        if not self.available:
+            return []
+        assert self.root is not None
+        needle = note_stem.lower()
+        out: list[dict[str, Any]] = []
+        for note in self.index():
+            path = self.root / note["path"]
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            for raw in _WIKILINK.findall(text):
+                name = raw.split("|")[0].split("#")[0].strip()
+                if pathlib.PurePath(name.replace("\\", "/")).stem.lower() == needle:
+                    out.append({"title": note["title"], "path": note["path"]})
+                    break
+        return out
+
+    def search(self, query: str, *, limit: int = 60) -> list[dict[str, Any]]:
+        """Full-text search across canonical notes, with a matching excerpt."""
+        if not self.available or not query.strip():
+            return []
+        assert self.root is not None
+        needle = query.strip().lower()
+        results: list[dict[str, Any]] = []
+        for note in self.index():
+            path = self.root / note["path"]
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            haystack = text.lower()
+            in_title = needle in note["title"].lower()
+            hits = haystack.count(needle)
+            if not hits and not in_title:
+                continue
+            excerpt = ""
+            position = haystack.find(needle)
+            if position >= 0:
+                start = max(0, position - 90)
+                excerpt = " ".join(text[start:position + 160].split())
+            results.append({
+                **note,
+                "hits": hits,
+                "in_title": in_title,
+                "excerpt": excerpt,
+            })
+        results.sort(key=lambda row: (not row["in_title"], -row["hits"]))
+        return results[:limit]

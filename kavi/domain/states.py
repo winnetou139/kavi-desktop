@@ -55,7 +55,40 @@ TASK_TERMINAL_STATES = ("DONE", "FAILED", "CANCELLED", "KILLED")
 
 CONFIDENCE_LEVELS = ("LOW", "MEDIUM", "HIGH")
 
+PRIORITY_LEVELS = ("LOW", "NORMAL", "HIGH", "CRITICAL")
+
 INBOX_TYPES = ("DECISION", "APPROVAL", "RISK", "OPPORTUNITY", "FYI")
+
+INBOX_STATES = ("OPEN", "APPROVED", "REJECTED", "DEFERRED", "EVIDENCE_REQUESTED")
+
+# Authority ladder. A3+ is not grantable in LOCAL MODE — nothing can execute.
+AUTHORITY_LEVELS = {
+    "A0": {
+        "name": "Observe",
+        "detail": "Read only. May report what it sees. No state change of any kind.",
+        "grantable_locally": True,
+    },
+    "A1": {
+        "name": "Recommend",
+        "detail": "May analyse and propose. The recommendation itself changes nothing.",
+        "grantable_locally": True,
+    },
+    "A2": {
+        "name": "Prepare",
+        "detail": "May draft an action and stage it for approval. May not commit it.",
+        "grantable_locally": True,
+    },
+    "A3": {
+        "name": "Execute Within Policy",
+        "detail": "May commit reversible actions inside an explicit policy envelope.",
+        "grantable_locally": False,
+    },
+    "A4": {
+        "name": "Bounded Autonomous Workflow",
+        "detail": "May run a defined multi-step workflow within budget, scope and expiry.",
+        "grantable_locally": False,
+    },
+}
 
 # Founder-facing states the UI must be able to render truthfully.
 RUNTIME_STATES = (
@@ -98,6 +131,16 @@ APPROVAL_TRANSITIONS: dict[str, tuple[str, ...]] = {
     "REVOKED": (),
 }
 
+# Founder disposition of an inbox item. DEFERRED and EVIDENCE_REQUESTED
+# return to OPEN; APPROVED/REJECTED are terminal for the item itself.
+INBOX_TRANSITIONS: dict[str, tuple[str, ...]] = {
+    "OPEN": ("APPROVED", "REJECTED", "DEFERRED", "EVIDENCE_REQUESTED"),
+    "DEFERRED": ("OPEN", "APPROVED", "REJECTED", "EVIDENCE_REQUESTED"),
+    "EVIDENCE_REQUESTED": ("OPEN", "APPROVED", "REJECTED", "DEFERRED"),
+    "APPROVED": (),
+    "REJECTED": (),
+}
+
 
 def _check(table: dict[str, tuple[str, ...]], kind: str, current: str, target: str) -> None:
     if current not in table:
@@ -122,6 +165,10 @@ def check_approval_transition(current: str, target: str) -> None:
     _check(APPROVAL_TRANSITIONS, "approval", current, target)
 
 
+def check_inbox_transition(current: str, target: str) -> None:
+    _check(INBOX_TRANSITIONS, "inbox item", current, target)
+
+
 def is_terminal_task_state(state: str) -> bool:
     return state in TASK_TERMINAL_STATES
 
@@ -138,6 +185,9 @@ def vocabularies() -> dict[str, tuple[str, ...]]:
         "objective_state": OBJECTIVE_STATES,
         "task_state": TASK_STATES,
         "confidence": CONFIDENCE_LEVELS,
+        "priority": PRIORITY_LEVELS,
         "inbox_type": INBOX_TYPES,
+        "inbox_state": INBOX_STATES,
         "runtime_state": RUNTIME_STATES,
+        "authority_level": tuple(AUTHORITY_LEVELS),
     }

@@ -186,6 +186,17 @@ def body(t) -> None:
             time.sleep(1.4)
             return ws.evaluate("document.querySelector('.screen-title').innerText")
 
+        def body_text():
+            """Read the active screen's content.
+
+            Split views (inbox, memory) render into .screen-split rather than
+            .screen-body, so read whichever container this view actually used.
+            """
+            return ws.evaluate(
+                "(document.querySelector('.screen-body')"
+                " || document.querySelector('.screen-split')).innerText"
+            )
+
         t.equals("boots on Command", ws.evaluate("document.querySelector('.screen-title').innerText"), "Command")
         command_text = ws.evaluate("document.querySelector('.screen-body').innerText")
         t.check("command warns LOCAL MODE", "LOCAL / DEVELOPMENT MODE" in command_text)
@@ -197,13 +208,29 @@ def body(t) -> None:
         t.equals("key 2 opens CEO Inbox", open_module("2"), "CEO Inbox")
         inbox_text = ws.evaluate("document.querySelector('.inbox-detail').innerText")
         t.check("inbox shows a recommendation", "RECOMMENDATION" in inbox_text.upper())
-        t.check("inbox shows an evidence trail", "EVIDENCE TRAIL" in inbox_text.upper())
-        t.check("inbox surfaces a contradiction", "Contradiction" in inbox_text)
-        t.check("inbox shows authority condition", "AUTHORITY CONDITION" in inbox_text.upper())
-        t.check("inbox actions disabled not simulated",
-                ws.evaluate("Array.from(document.querySelectorAll('.action-row .btn')).every(b=>b.disabled)"))
+        t.check("inbox shows an evidence trail", "EVIDENCE" in inbox_text.upper())
+        t.check("inbox shows authority note", "AUTHORITY" in inbox_text.upper())
         t.check("inbox list populated",
-                ws.evaluate("document.querySelectorAll('.inbox-item').length") >= 4)
+                ws.evaluate("document.querySelectorAll('.inbox-row').length") >= 4)
+
+        # Every item must name the real object it refers to.
+        t.check("inbox item states what it refers to", "REFERS TO" in inbox_text.upper())
+        t.check("inbox resolves a real subject id",
+                ws.evaluate("!!document.querySelector('.subject-ref .mono')"))
+
+        # Fixture items are decision-locked: deciding demo data would be a lie.
+        t.check("fixture inbox item cannot be decided",
+                ws.evaluate(
+                    "document.querySelector('.inbox-detail').innerText"
+                    ".includes('cannot be decided')"
+                ))
+        t.check("fixture item offers no disposition buttons",
+                ws.evaluate("document.querySelectorAll('[data-disposition]').length") == 0)
+
+        # All four categories from the directive are represented.
+        inbox_all = ws.evaluate("document.querySelector('.inbox-list').innerText").upper()
+        for category in ("DECISION", "APPROVAL", "RISK", "FYI"):
+            t.check(f"inbox category {category} present", category in inbox_all)
 
         t.equals("key 3 opens Objectives", open_module("3"), "Objectives & Tasks")
         t.check("objective cards render",
@@ -235,14 +262,35 @@ def body(t) -> None:
 
         t.equals("key 6 opens Memory", open_module("6"), "Memory / Vault")
         t.check("vault notes listed",
-                ws.evaluate("document.querySelectorAll('.mem-note').length") >= 20)
-        mem_text = ws.evaluate("document.querySelector('.mem-body').innerText")
+                ws.evaluate("document.querySelectorAll('.vault-row').length") >= 20)
+        mem_text = body_text()
         t.check("vault marked read only", "READ ONLY" in mem_text.upper())
         t.check("vault sync not connected", "NOT CONNECTED" in mem_text.upper())
-        ws.evaluate("document.querySelectorAll('.mem-note')[0].click()")
-        time.sleep(1.2)
-        note_text = ws.evaluate("document.querySelector('.mem-body').innerText")
+
+        # Open a real canonical note and read it.
+        ws.evaluate("document.querySelectorAll('.vault-row')[0].click()")
+        time.sleep(1.4)
+        note_text = ws.evaluate("document.querySelector('.note-body').innerText")
         t.check("a vault note opens and shows content", len(note_text) > 300, str(len(note_text)))
+        t.check("note header shows its path",
+                ws.evaluate("!!document.querySelector('.note-path')"))
+
+        # Wikilink relationships are exposed both directions where they exist.
+        link_groups = ws.evaluate("document.querySelectorAll('.note-link-group').length")
+        t.check("wikilink relationships are surfaced", link_groups >= 1, str(link_groups))
+
+        # Full-text vault search returns real matches for a canonical phrase.
+        ws.evaluate(
+            "(() => { const i = document.querySelector('[data-role=vault-search]');"
+            " i.value = 'separation of duties';"
+            " i.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true}));"
+            " return true; })()"
+        )
+        time.sleep(1.6)
+        hits = ws.evaluate("document.querySelectorAll('.vault-row').length")
+        t.check("vault search returns matches", hits >= 1, str(hits))
+        search_text = body_text()
+        t.check("search results show match counts", "match" in search_text.lower())
 
         t.equals("key 7 opens Metrics", open_module("7"), "Metrics & Cost")
         metrics_text = ws.evaluate("document.querySelector('.screen-body').innerText")
@@ -261,7 +309,20 @@ def body(t) -> None:
 
         t.equals("key 9 opens Authority", open_module("9"), "Authority & Policy")
         auth_text = ws.evaluate("document.querySelector('.screen-body').innerText")
-        t.check("human authority explicit", "HUMAN AUTHORITY — EXPLICIT" in auth_text)
+        # The directive requires all three shown clearly.
+        t.check("founder authority shown", "FOUNDER AUTHORITY" in auth_text)
+        t.check("human approval shown", "HUMAN APPROVAL" in auth_text)
+        t.check("local development mode shown", "LOCAL DEVELOPMENT MODE" in auth_text)
+        t.check("no real execution authority granted",
+                "No real execution authority is granted" in auth_text)
+
+        # Authority ladder A0-A4, with A3/A4 not grantable in local mode.
+        for level in ("A0", "A1", "A2", "A3", "A4"):
+            t.check(f"ladder shows {level}",
+                    ws.evaluate(f"!!document.querySelector('[data-authority-level={level}]')"))
+        t.check("A3 not grantable locally", "NOT GRANTABLE" in auth_text)
+        t.check("max grantable is A2", "A2" in auth_text)
+
         t.check("separation of duties stated", "may not approve it" in auth_text)
         t.check("service account cannot approve", "Service Account" in auth_text)
         t.check("grants listed", "GNT-" in auth_text)

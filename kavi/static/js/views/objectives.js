@@ -85,6 +85,11 @@ export async function render(host, ctx) {
         }));
       }
       actions.push(el('button', {
+        class: 'btn sm', type: 'button', text: 'Raise to CEO Inbox',
+        'data-action': 'raise-inbox',
+        onclick: () => raiseForm(ctx, objective),
+      }));
+      actions.push(el('button', {
         class: 'btn sm primary', type: 'button', text: 'Add task',
         onclick: () => taskForm(ctx, objective.id),
       }));
@@ -171,9 +176,15 @@ export function objectiveForm(ctx, prefill = '') {
     el('div', { class: 'form-grid' }, [
       field('Owner actor ID', input('owner_actor_id', 'ACT-…')),
       field('Sponsor actor ID', input('sponsor_actor_id', 'ACT-…')),
+      field('Priority', select('priority', ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'], 'NORMAL')),
+      field('Authority level', select('authority_level', ['A0', 'A1', 'A2'], 'A0'),
+        'A3 and A4 are not grantable in LOCAL MODE.'),
       field('Permission grant ID', input('permission_grant_id', 'GNT-…')),
       field('Budget', input('budget', 'e.g. 0 external spend')),
+      field('Deadline', input('deadline', 'YYYY-MM-DD')),
+      field('Venture ID', input('venture_id', 'VEN-…')),
     ]),
+    field('Success criteria', textarea('success_criteria', 'How will you know this succeeded?')),
     field('Constraints', textarea('constraints', 'What may this objective NOT do?')),
     field('Evidence requirements', textarea('evidence_requirements', 'What evidence standard applies?')),
     field('Initial state', select('state', ['DRAFT', 'ACTIVE'], 'DRAFT'),
@@ -204,7 +215,17 @@ function taskForm(ctx, objectiveId) {
     field('Expected output', textarea('expected_output', 'What artifact or answer must this produce?')),
     el('div', { class: 'form-grid' }, [
       field('Assignee actor ID', input('assignee_actor_id', 'ACT-…')),
+      field('Assigned role', input('assigned_role_id', 'ROLE-…')),
+      field('Priority', select('priority', ['LOW', 'NORMAL', 'HIGH', 'CRITICAL'], 'NORMAL')),
+      field('Authority level', select('authority_level', ['A0', 'A1', 'A2'], 'A0')),
       field('Permission grant ID', input('permission_grant_id', 'GNT-…')),
+      field('Depends on', input('depends_on', 'TASK-…, TASK-…'),
+        'Comma separated. A task cannot run until these are DONE.'),
+    ]),
+    field('Evidence requirement', textarea('evidence_requirement', 'What evidence must this produce?')),
+    el('div', { class: 'form-grid' }, [
+      field('Review required', select('review_required', ['false', 'true'], 'false')),
+      field('Approval required', select('approval_required', ['false', 'true'], 'false')),
     ]),
   ]);
   openModal(`New task under ${objectiveId}`, body, [
@@ -236,6 +257,14 @@ function taskDetail(ctx, task) {
       ['Assigned role', task.assigned_role_id],
       ['Permission grant', task.permission_grant_id],
       ['Expected output', task.expected_output],
+      ['Priority', task.priority],
+      ['Authority level', task.authority_level],
+      ['Depends on', task.depends_on],
+      ['Evidence requirement', task.evidence_requirement],
+      ['Review required', task.review_required ? 'YES' : 'NO'],
+      ['Approval required', task.approval_required ? 'YES' : 'NO'],
+      ['Created at', task.created_at],
+      ['Updated at', task.updated_at],
       ['Estimated cost', task.estimated_cost],
       ['Actual cost', task.actual_cost],
       ['Idempotency key', task.idempotency_key],
@@ -278,4 +307,47 @@ function collect(scope) {
     payload[node.name] = node.value;
   }
   return payload;
+}
+
+
+/**
+ * Raise a Founder-level item from this objective into the CEO Inbox.
+ *
+ * The inbox is an aggregation, so the item stores a reference to the real
+ * object rather than a copy of it. Nothing is sent anywhere; this writes local
+ * state only.
+ */
+function raiseForm(ctx, objective) {
+  const body = el('div', {}, [
+    notice(
+      `This raises a Founder-level item referencing <b>${objective.id}</b>. `
+      + 'The inbox stores the reference, not a copy. No external action is taken.',
+    ),
+    el('div', { class: 'form-grid' }, [
+      field('Type', select('type', ['DECISION', 'APPROVAL', 'RISK', 'OPPORTUNITY', 'FYI'], 'DECISION')),
+      field('Risk', select('risk', ['LOW', 'MEDIUM', 'HIGH'], 'MEDIUM')),
+    ]),
+    field('Title', input('title', `Review required: ${objective.title}`)),
+    field('Recommendation', textarea('recommendation', 'What are you recommending the Founder do?')),
+    field('Authority note', textarea('authority_note', 'What authority applies? What is reversible?')),
+  ]);
+
+  openModal(`Raise to CEO Inbox — ${objective.id}`, body, [
+    el('button', { class: 'btn ghost', type: 'button', text: 'Cancel', onclick: closeModal }),
+    el('button', {
+      class: 'btn primary', type: 'button', text: 'Raise item',
+      onclick: async () => {
+        try {
+          const created = await api.createInboxItem({
+            ...collect(body),
+            subject_kind: 'OBJECTIVE',
+            subject_id: objective.id,
+          });
+          closeModal();
+          toast(`Inbox item <b>${created.id}</b> raised from ${objective.id}.`);
+          ctx.navigate('inbox');
+        } catch (error) { toast(error.message, 'err'); }
+      },
+    }),
+  ]);
 }
