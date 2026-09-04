@@ -404,9 +404,87 @@ def body_functionalization(t):
     )
 
 
+# ------------------------------------------------- canonical decision log
+
+
+def body_canonical_decisions(t):
+    """Decisions must come from the vault, never from invented fixtures."""
+    import pathlib
+    import tempfile
+
+    from kavi.container import build_service
+
+    store = pathlib.Path(tempfile.mkdtemp()) / "kavi.json"
+    s = build_service(data_path=store)
+
+    from kavi.infrastructure import fixtures
+    t.check("no fixture decisions exist at all", fixtures.decisions() == [])
+
+    decisions = s.list_decisions()
+    t.check("canonical decisions are read", len(decisions) >= 6, str(len(decisions)))
+    t.check("no decision is fixture origin",
+            all(d.get("origin") != "FIXTURE" for d in decisions))
+    t.check("canonical decisions are marked VAULT",
+            all(d.get("origin") == "VAULT" for d in decisions if d["id"].startswith("D-0")))
+
+    by_id = {d["id"]: d for d in decisions}
+    for identifier in ("D-001", "D-002", "D-003", "D-004", "D-005", "D-006"):
+        t.check(f"{identifier} read from vault", identifier in by_id)
+
+    d1 = by_id.get("D-001", {})
+    t.check("decision carries its real title",
+            "KAVI is the company" in d1.get("title", ""))
+    t.check("decision state parsed", d1.get("state") == "APPROVED")
+    t.check("decision date parsed", d1.get("date") == "2026-09-04")
+    t.check("decision approver parsed", d1.get("approver_actor_id") == "Founder")
+    t.check("decision context is real prose", len(d1.get("context", "")) > 60)
+    t.check("decision rationale present", len(d1.get("rationale", "")) > 20)
+    t.check("decision cites its source file", d1.get("source_path", "").endswith(".md"))
+
+    # The old fixture claimed every decision was reversible "Yes". The real
+    # record says the opposite. This is the exact class of quiet falsehood the
+    # vault-backed reader exists to prevent.
+    t.check("reversibility is the record's real answer, not 'Yes'",
+            d1.get("reversible") != "Yes")
+    t.check("reversibility states the true condition",
+            "superseding Founder decision" in d1.get("reversible", ""))
+
+    d6 = by_id.get("D-006", {})
+    t.check("D-006 carries the VECYRA baseline",
+            "VALIDATE" in d6.get("title", "") or "VALIDATE" in d6.get("decision", ""))
+
+    status = s.decisions_status()
+    t.check("decision source is stated", status["source"] == "CANONICAL VAULT")
+    t.check("decision access is read only", status["access"] == "READ ONLY")
+    t.check("decision count reported", status["canonical_count"] >= 6)
+    t.check("status says the desktop never writes decisions",
+            "never writes" in status["detail"])
+
+    # An inbox item may reference a canonical decision.
+    item = s.create_inbox_item({
+        "subject_kind": "DECISION", "subject_id": "D-005",
+        "type": "FYI", "title": "Vault ownership confirmed",
+    })
+    t.check("inbox item can reference a vault decision",
+            item["subject"]["found"] is True)
+    t.check("vault decision subject is marked VAULT",
+            item["subject"]["origin"] == "VAULT")
+
+    try:
+        s.create_inbox_item({
+            "subject_kind": "DECISION", "subject_id": "D-999",
+            "type": "FYI", "title": "nonexistent",
+        })
+        t.check("inbox item on unknown decision refused", False)
+    except Exception as exc:
+        t.check("inbox item on unknown decision refused",
+                "canonical vault" in str(exc))
+
+
 def body(t):
     body_core(t)
     body_functionalization(t)
+    body_canonical_decisions(t)
 
 
 if __name__ == "__main__":

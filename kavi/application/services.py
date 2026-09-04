@@ -323,6 +323,23 @@ class CockpitService:
         subject_id = item.get("subject_id") or item.get("objective_id") or ""
         if not kind and subject_id.startswith("OBJ-"):
             kind = "OBJECTIVE"
+
+        # Decisions live in the canonical vault, not the operational store.
+        if kind == "DECISION":
+            decision = self.get_decision(subject_id)
+            if decision is None:
+                return {
+                    "kind": kind, "id": subject_id, "found": False,
+                    "detail": "No such decision in the canonical vault.",
+                }
+            return {
+                "kind": kind,
+                "id": subject_id,
+                "found": True,
+                "title": decision.get("title", subject_id),
+                "state": decision.get("state", ""),
+                "origin": decision.get("origin", "VAULT"),
+            }
         collection = collection_for.get(kind)
         if not collection or not subject_id:
             return None
@@ -370,9 +387,18 @@ class CockpitService:
         collection = collection_for.get(subject_kind)
         if collection is None:
             raise UseCaseError(f"unknown subject kind: {subject_kind}")
-        subject = self.repo.get(collection, subject_id)
-        if subject is None:
-            raise UseCaseError(f"{subject_kind.lower()} {subject_id} not found")
+
+        # A decision is canonical vault knowledge, not an operational record.
+        if subject_kind == "DECISION":
+            subject = self.get_decision(subject_id)
+            if subject is None:
+                raise UseCaseError(
+                    f"decision {subject_id} is not in the canonical vault"
+                )
+        else:
+            subject = self.repo.get(collection, subject_id)
+            if subject is None:
+                raise UseCaseError(f"{subject_kind.lower()} {subject_id} not found")
 
         objective_id = ""
         if subject_kind == "OBJECTIVE":
@@ -467,7 +493,43 @@ class CockpitService:
     # ---------------------------------------------------------- decisions
 
     def list_decisions(self) -> list[dict[str, Any]]:
-        return self.repo.list("decisions")
+        """Canonical decisions, read from the vault.
+
+        The vault owns decisions (D-005). Any local decision record is merged in
+        and stays clearly marked LOCAL so it is never mistaken for canon. If the
+        vault cannot be reached, this returns whatever is local rather than
+        inventing a decision log.
+        """
+        canonical = self.vault.decisions()
+        local = [d for d in self.repo.list("decisions") if d.get("origin") != "FIXTURE"]
+        known = {d["id"] for d in canonical}
+        merged = canonical + [d for d in local if d["id"] not in known]
+        merged.sort(key=lambda row: row.get("id", ""))
+        return merged
+
+    def decisions_status(self) -> dict[str, Any]:
+        """Where the decision log is being read from, stated plainly."""
+        status = self.vault.status()
+        canonical = self.vault.decisions()
+        return {
+            "source": "CANONICAL VAULT" if canonical else "VAULT NOT AVAILABLE",
+            "path": status.get("path", ""),
+            "access": "READ ONLY",
+            "canonical_count": len(canonical),
+            "detail": (
+                "Decisions are read from 08_DECISIONS/ in the canonical vault. "
+                "The desktop never writes a decision record."
+                if canonical else
+                "The canonical vault could not be read, so no canonical decision "
+                "is shown. Nothing is substituted in its place."
+            ),
+        }
+
+    def get_decision(self, decision_id: str) -> dict[str, Any] | None:
+        for row in self.list_decisions():
+            if row.get("id") == decision_id:
+                return row
+        return None
 
     # ---------------------------------------------------------- evidence
 

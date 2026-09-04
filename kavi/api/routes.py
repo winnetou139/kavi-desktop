@@ -169,7 +169,10 @@ def build_router(service: CockpitService) -> Router:
 
     @router.get("/api/decisions")
     def decisions(query: dict[str, Any], body: dict[str, Any]) -> Any:
-        return {"decisions": service.list_decisions()}
+        return {
+            "decisions": service.list_decisions(),
+            "status": service.decisions_status(),
+        }
 
     # ------------------------------------------------------------ evidence
 

@@ -510,3 +510,7 @@ table.grid td b{color:var(--txt);font-weight:600}
 .bullet-list.tone-amber li::marker { color:var(--amber); }
 .bullet-list.tone-red li::marker { color:var(--red); }
 .bullet-list.tone-mint li::marker { color:var(--mint); }
+tr.clickable { cursor:pointer; }
+tr.clickable:hover { background:var(--pan-2); }
+tr.clickable.sel { background:var(--pan-2); box-shadow:inset 2px 0 0 var(--amber); }
+td.reversible { max-width:340px; font-size:10.5px; color:var(--txt-3); line-height:1.5; }

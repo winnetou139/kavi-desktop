@@ -19,7 +19,11 @@ from typing import Any
 
 from kavi.domain import states
 
-ORIGINS = ("LOCAL", "FIXTURE")
+# Where a record came from, and therefore how much it may be trusted.
+#   LOCAL   — created in this application, machine-operational state
+#   FIXTURE — development demo data; never company evidence
+#   VAULT   — read from the canonical KAVI Vault; authoritative, read-only
+ORIGINS = ("LOCAL", "FIXTURE", "VAULT")
 
 UNKNOWN = "UNKNOWN / REQUIRES VALIDATION"
 

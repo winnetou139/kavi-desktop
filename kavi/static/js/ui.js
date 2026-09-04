@@ -77,8 +77,19 @@ export function chip(text, tone) {
 
 /** Origin chip. FIXTURE data must always be visibly labelled. */
 export function originChip(origin) {
-  if (origin !== 'FIXTURE') return null;
-  return el('span', { class: 'chip amber', text: 'FIXTURE', title: 'Development fixture data — not company evidence' });
+  if (origin === 'FIXTURE') {
+    return el('span', {
+      class: 'chip amber', text: 'FIXTURE',
+      title: 'Development fixture data — not company evidence',
+    });
+  }
+  if (origin === 'VAULT') {
+    return el('span', {
+      class: 'chip mint', text: 'VAULT',
+      title: 'Read from the canonical KAVI Vault — authoritative, read-only',
+    });
+  }
+  return null;
 }
 
 export function unknown(text = 'UNKNOWN / REQUIRES VALIDATION') {

@@ -506,39 +506,16 @@ def approvals() -> list[dict[str, Any]]:
 
 
 def decisions() -> list[dict[str, Any]]:
-    rows = [
-        ("D-001", "KAVI is the company; VECYRA is a product",
-         "Product portfolio remains open beyond VECYRA."),
-        ("D-002", "KAVI must not depend on Hermes",
-         "Hermes is an orchestration capability, not canonical company state."),
-        ("D-003", "Local desktop is cockpit; VPS is engine room",
-         "Future always-on work is separated from Founder-laptop uptime."),
-        ("D-004", "Problem and validation precede serious product build",
-         "Venture work follows evidence and phase gates."),
-        ("D-005", "KAVI Vault is the canonical organizational knowledge source",
-         "Vault owns organizational knowledge; Operational Store owns machine-operational state."),
-        ("D-006", "VECYRA baseline is VALIDATE at G2, not passed",
-         "Commercial evidence must not be inferred from product maturity."),
-    ]
-    return [
-        {
-            "id": identifier,
-            "title": title,
-            "state": "APPROVED",
-            "owner_actor_id": "ACT-2026-001",
-            "approver_actor_id": "ACT-2026-001",
-            "date": "2026-09-04",
-            "context": "",
-            "decision": title,
-            "rationale": consequence,
-            "evidence_ids": "",
-            "consequences": consequence,
-            "reversible": "Yes",
-            "supersedes": "",
-            "origin": FIXTURE,
-        }
-        for identifier, title, consequence in rows
-    ]
+    """No fixture decisions exist.
+
+    Decisions are canonical organizational knowledge owned by the KAVI Vault
+    (D-005). The desktop reads the real records from 08_DECISIONS/ instead of
+    demonstrating with invented ones. A fabricated decision record is the most
+    damaging fixture possible: it looks exactly like governance while carrying
+    none of it. The previous fixture claimed every decision was reversible
+    ("Yes"), which contradicted the actual records.
+    """
+    return []
 
 
 def inbox() -> list[dict[str, Any]]:

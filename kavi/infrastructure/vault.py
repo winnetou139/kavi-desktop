@@ -15,6 +15,8 @@ DEFAULT_VAULT_CANDIDATES = (
     r"C:\Users\abdul.kausar\Desktop\AI Workspace\PCOS\KAVI_Vault_v0.1\KAVI_Vault_v0.1",
 )
 
+UNKNOWN_TEXT = "UNKNOWN / NOT STATED IN THE RECORD"
+
 _FRONTMATTER = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _WIKILINK = re.compile(r"\[\[([^\]]+)\]\]")
 
@@ -206,6 +208,88 @@ class VaultReader:
                     out.append({"title": note["title"], "path": note["path"]})
                     break
         return out
+
+    # ------------------------------------------------------------ decisions
+
+    def decisions(self) -> list[dict[str, Any]]:
+        """Read the canonical decision records from 08_DECISIONS/.
+
+        Decisions are organizational knowledge, so the vault owns them (D-005).
+        The desktop reads them and never writes one. Anything the record does
+        not state is returned empty rather than guessed — a decision record is
+        exactly the place where invention is most damaging.
+        """
+        if not self.available:
+            return []
+        assert self.root is not None
+        folder = self.root / "08_DECISIONS"
+        if not folder.is_dir():
+            return []
+
+        out: list[dict[str, Any]] = []
+        for path in sorted(folder.glob("*.md")):
+            if path.stem.lower().startswith("decision log"):
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            record = self._parse_decision(text, path)
+            if record:
+                out.append(record)
+        out.sort(key=lambda row: row["id"])
+        return out
+
+    def _parse_decision(self, text: str, path: pathlib.Path) -> dict[str, Any] | None:
+        front = _parse_frontmatter(text)
+        body = _FRONTMATTER.sub("", text)
+
+        bold = dict(re.findall(r"\*\*(.+?):\*\*\s*(.*)", body))
+        identifier = (bold.get("Decision ID") or "").strip()
+        if not identifier:
+            match = re.match(r"(D-\d+)", path.stem)
+            identifier = match.group(1) if match else ""
+        if not identifier:
+            return None
+
+        def section(name: str) -> str:
+            match = re.search(
+                rf"^##\s+{re.escape(name)}\s*\n(.*?)(?=^##\s|\Z)",
+                body, re.MULTILINE | re.DOTALL,
+            )
+            if not match:
+                return ""
+            return " ".join(match.group(1).split()).strip()
+
+        title = (front.get("title") or "").strip()
+        if " — " in title:
+            title = title.split(" — ", 1)[1]
+        if not title:
+            heading = re.search(r"^#\s+(.+)$", body, re.MULTILINE)
+            title = heading.group(1).replace("Decision — ", "").strip() if heading else path.stem
+
+        state = (bold.get("Decision State") or "").strip().upper()
+        em_dash_is_empty = lambda value: "" if value.strip() in ("—", "-", "") else value.strip()
+
+        return {
+            "id": identifier,
+            "title": title,
+            "state": state or "UNKNOWN",
+            "owner_actor_id": em_dash_is_empty(bold.get("Owner", "")),
+            "approver_actor_id": em_dash_is_empty(bold.get("Approver", "")),
+            "date": em_dash_is_empty(bold.get("Date", "")),
+            "context": section("Context"),
+            "decision": section("Decision"),
+            "rationale": section("Why"),
+            "evidence_ids": section("Evidence basis"),
+            "consequences": section("Consequences"),
+            "reversible": section("Reversible?") or UNKNOWN_TEXT,
+            "supersedes": em_dash_is_empty(bold.get("Supersedes", "")),
+            "review_date": section("Review date"),
+            "alternatives": section("Alternatives considered"),
+            "source_path": str(path.relative_to(self.root)),
+            "origin": "VAULT",
+        }
 
     def search(self, query: str, *, limit: int = 60) -> list[dict[str, Any]]:
         """Full-text search across canonical notes, with a matching excerpt."""
