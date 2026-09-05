@@ -49,6 +49,7 @@ export const api = {
   decideInboxItem: (id, disposition, note) =>
     request('POST', '/api/inbox/decide', { id, disposition, note }),
 
+  vecyra: () => get('/api/vecyra'),
   ventures: () => request('GET', '/api/ventures'),
   venture: (id) => request('GET', `/api/venture${qs({ id })}`),
   organization: () => request('GET', '/api/organization'),

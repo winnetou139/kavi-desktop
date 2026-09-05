@@ -29,6 +29,7 @@ from kavi.infrastructure.execution import ExecutionCapability, ExecutionRequest
 from kavi.infrastructure.repository import Repository
 from kavi.infrastructure.runtime_status import RuntimeStatusProvider
 from kavi.infrastructure.vault import VaultReader
+from kavi.infrastructure.vecyra_repo import VecyraReader
 
 
 class UseCaseError(Exception):
@@ -42,10 +43,13 @@ class CockpitService:
         runtime: RuntimeStatusProvider,
         vault: VaultReader,
         execution: ExecutionCapability,
+        vecyra: "VecyraReader | None" = None,
     ) -> None:
         self.repo = repository
         self.runtime = runtime
         self.vault = vault
+        # Optional so existing callers and tests keep working unchanged.
+        self.vecyra = vecyra if vecyra is not None else VecyraReader()
         self.execution = execution
         # Runs started from the cockpit, so their result can be polled.
         self._runs: dict[str, Any] = {}
@@ -530,6 +534,16 @@ class CockpitService:
         return row
 
     # ---------------------------------------------------------- decisions
+
+    def vecyra_program(self) -> dict[str, Any]:
+        """VECYRA phase and gate state, read from the product repo.
+
+        The Founder asked which phase VECYRA is in. That answer is written in
+        the product repository, not here, so it is read rather than restated.
+        When the repo is missing every field reads UNKNOWN -- a cockpit that
+        invents a phase is worse than one that admits it cannot see.
+        """
+        return self.vecyra.summary()
 
     def list_decisions(self) -> list[dict[str, Any]]:
         """Canonical decisions, read from the vault.

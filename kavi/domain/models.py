@@ -23,7 +23,8 @@ from kavi.domain import states
 #   LOCAL   — created in this application, machine-operational state
 #   FIXTURE — development demo data; never company evidence
 #   VAULT   — read from the canonical KAVI Vault; authoritative, read-only
-ORIGINS = ("LOCAL", "FIXTURE", "VAULT")
+# VECYRA: read from the product repository, which owns build state.
+ORIGINS = ("LOCAL", "FIXTURE", "VAULT", "VECYRA")
 
 UNKNOWN = "UNKNOWN / REQUIRES VALIDATION"
 

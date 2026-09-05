@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import pathlib
 import sys
 import tempfile
 
@@ -554,9 +555,23 @@ def body_canonical_evidence(t):
     t.check("CLM-001 keeps its downward-trend caveat",
             "downward" in c1.get("contradiction", ""))
     c7 = by_id.get("CLM-007", {})
-    t.check("CLM-007 discloses the primary text was never retrieved",
-            "never retrieved" in c7.get("contradiction", ""))
-    t.check("CLM-007 confidence is not overstated", c7.get("confidence") == "MEDIUM")
+    # CLM-007 was verified against the official SCL text on 2026-09-05, which
+    # also exposed a fabricated quotation. The assertion now guards the
+    # correction rather than the old unverified state.
+    t.check("CLM-007 records that it was verified against the primary text",
+            "VERIFIED against primary text" in c7.get("contradiction", ""))
+    t.check("CLM-007 discloses the fabricated phrase it corrected",
+            "not after the event" in c7.get("contradiction", ""))
+    t.equals("CLM-007 confidence rose to HIGH after primary verification",
+             c7.get("confidence"), "HIGH")
+
+    # CLM-008 could NOT be verified (AACE is paywalled), so it must not have
+    # been quietly promoted alongside CLM-007.
+    c8 = by_id.get("CLM-008", {})
+    t.check("CLM-008 still admits the primary text was never retrieved",
+            "never retrieved" in c8.get("contradiction", "").lower())
+    t.equals("CLM-008 was downgraded to INFERENCE, not left as FACT",
+             c8.get("classification"), "INFERENCE")
 
     # D-006: founder/domain evidence is its own class, never market validation.
     founder_claims = [c for c in claims
@@ -649,12 +664,78 @@ def body_ssh_adapter(t):
             "_write_transcript" in source)
 
 
+# ------------------------------------------------- vecyra build programme
+
+
+def body_vecyra_program(t):
+    """The cockpit must read product phase state, never invent it."""
+    from kavi.infrastructure.vecyra_repo import VecyraReader, UNKNOWN
+
+    # A missing repo must degrade to UNKNOWN, not to a guessed phase.
+    absent = VecyraReader(root="/no/such/place")
+    status = absent.describe()
+    t.check("a missing product repo reports NOT FOUND", status["access"] == "NOT FOUND")
+    t.check("a missing product repo yields no phases", absent.phases() == [])
+    t.equals("a missing repo leaves the gate UNKNOWN", absent.gate()["status"], UNKNOWN)
+    summary = absent.summary()
+    t.equals("a missing repo leaves the current phase UNKNOWN",
+             summary["current_phase"], UNKNOWN)
+
+    reader = VecyraReader()
+    if not reader.available():
+        t.check("product repo absent on this machine; parsing not exercised", True)
+        return
+
+    phases = reader.phases()
+    t.check("the roadmap yields phases", len(phases) >= 5, f"got {len(phases)}")
+    ids = [p.id for p in phases]
+    for expected in ("F0", "F1", "F5"):
+        t.check(f"phase {expected} is read from the roadmap", expected in ids, str(ids))
+
+    states = {p.state for p in phases}
+    t.check("phase states use the known vocabulary",
+            states <= {"DONE", "IN PROGRESS", "PARTIAL", "PENDING", "POST-BETA", UNKNOWN},
+            str(states))
+    t.check("every phase carries origin VECYRA",
+            all(p.origin == "VECYRA" for p in phases))
+    t.check("no phase scope is empty", all(p.scope for p in phases))
+
+    gate = reader.gate()
+    t.check("the gate status is read, not assumed",
+            gate["status"] in ("PASSED", "NOT PASSED", UNKNOWN), gate["status"])
+    t.check("the gate names the file it came from",
+            "SESSION-HANDOFF" in gate["source"])
+
+    # The gate must never read PASSED while the handoff says otherwise. This is
+    # the assertion that stops the cockpit from flattering the product.
+    handoff = (reader.docs / "SESSION-HANDOFF.md")
+    if handoff.is_file():
+        text = handoff.read_text(encoding="utf-8", errors="replace")
+        if "BETA GATE BELUM PASS" in text.upper():
+            t.equals("gate reads NOT PASSED because the handoff says so",
+                     gate["status"], "NOT PASSED")
+
+    summary = reader.summary()
+    t.equals("the summary is read only", summary["access"], "READ ONLY")
+    t.check("the summary names a current phase",
+            summary["current_phase"] != UNKNOWN or
+            all(p.state != "IN PROGRESS" for p in phases))
+
+    # The reader must be read-only in fact, not just in wording.
+    source = (pathlib.Path(__file__).resolve().parents[1]
+              / "kavi" / "infrastructure" / "vecyra_repo.py").read_text(encoding="utf-8")
+    for forbidden in ("write_text(", "open(", "mkdir(", "unlink("):
+        t.check(f"the product repo reader never calls {forbidden}",
+                forbidden not in source)
+
+
 def body(t):
     body_core(t)
     body_functionalization(t)
     body_canonical_decisions(t)
     body_canonical_evidence(t)
     body_ssh_adapter(t)
+    body_vecyra_program(t)
 
 
 if __name__ == "__main__":

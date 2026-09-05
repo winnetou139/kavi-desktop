@@ -10,6 +10,7 @@ from kavi.infrastructure.repository import Repository
 from kavi.infrastructure.runtime_status import LocalRuntimeStatusProvider
 from kavi.infrastructure.store import JsonStore
 from kavi.infrastructure.vault import VaultReader
+from kavi.infrastructure.vecyra_repo import VecyraReader
 
 
 def build_service(
@@ -25,5 +26,6 @@ def build_service(
         repository=repository,
         runtime=LocalRuntimeStatusProvider(),
         vault=VaultReader(vault_path),
+        vecyra=VecyraReader(),
         execution=get_adapter(execution_adapter),
     )

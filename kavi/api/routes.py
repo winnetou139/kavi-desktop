@@ -195,6 +195,12 @@ def build_router(service: CockpitService) -> Router:
             "status": service.decisions_status(),
         }
 
+    # ------------------------------------------------------- vecyra program
+
+    @router.get("/api/vecyra")
+    def vecyra(query: dict[str, Any], body: dict[str, Any]) -> Any:
+        return service.vecyra_program()
+
     # ------------------------------------------------------------ evidence
 
     @router.get("/api/evidence")

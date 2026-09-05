@@ -13,7 +13,19 @@ export const meta = {
 
 export async function render(host, ctx) {
   const { ventures } = await api.ventures();
-  ctx.setHeadStats([{ v: ventures.length, l: 'Ventures', tone: 'mint' }]);
+
+  // Product build state lives in the VECYRA repository, not here. Read it so
+  // the Founder can see which phase the product is actually in.
+  let program = null;
+  try { program = await api.vecyra(); } catch (e) { program = null; }
+
+  const stats = [{ v: ventures.length, l: 'Ventures', tone: 'mint' }];
+  if (program && program.available) {
+    stats.push({ v: program.current_phase, l: 'Build phase', tone: 'amber' });
+    stats.push({ v: program.gate.status, l: program.gate.name,
+                 tone: program.gate.status === 'PASSED' ? 'mint' : 'rose' });
+  }
+  ctx.setHeadStats(stats);
 
   if (!ventures.length) {
     host.appendChild(el('div', { class: 'empty' }, [el('b', { text: 'No ventures recorded' })]));
@@ -21,6 +33,37 @@ export async function render(host, ctx) {
   }
 
   const stack = el('div', { class: 'stack' });
+
+  // ---- VECYRA build programme (read-only, from the product repo) --------
+  if (program) {
+    const body = el('div', { class: 'stack' });
+    if (!program.available) {
+      body.appendChild(notice(program.detail, 'amber'));
+    } else {
+      body.appendChild(kv([
+        ['Source', program.source],
+        ['Access', program.access],
+        ['Current phase', `${program.current_phase} — ${program.current_scope}`],
+        ['Gate', `${program.gate.name}: ${program.gate.status} (as of ${program.gate.as_of})`],
+      ]));
+      const ladder = el('div', { class: 'gates' });
+      for (const phase of program.phases) {
+        const tone = phase.state === 'DONE' ? 'done'
+                   : phase.state === 'IN PROGRESS' ? 'active'
+                   : phase.state === 'PARTIAL' ? 'partial' : 'todo';
+        const cell = el('div', { class: `gate gate-${tone}`, title: phase.scope });
+        cell.appendChild(el('b', { text: phase.id }));
+        cell.appendChild(el('span', { text: phase.state }));
+        ladder.appendChild(cell);
+      }
+      body.appendChild(ladder);
+      body.appendChild(notice(
+        'Phases and gate are read from the VECYRA product repository. The cockpit ' +
+        'never writes to it, and may not advance a gate.', 'amber'));
+    }
+    stack.appendChild(panel('VECYRA build programme', body, originChip('VECYRA')));
+  }
+
   stack.appendChild(notice(
     'KAVI may not approve a gate. Gate advancement requires explicit Founder approval.',
     'amber',
