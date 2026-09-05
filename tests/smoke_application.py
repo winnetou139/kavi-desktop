@@ -863,6 +863,89 @@ def body_kavi_programme(t):
                 forbidden not in source)
 
 
+# ------------------------------------------------------------- authentication
+
+
+def body_auth(t):
+    """The gate that lets the cockpit leave 127.0.0.1 safely."""
+    import tempfile
+    from kavi.infrastructure.auth import Auth
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = pathlib.Path(tmp) / "auth.json"
+        auth = Auth(path=path)
+
+        # LOCAL MODE must stay open, or the desktop workflow breaks.
+        t.equals("no password means LOCAL MODE", auth.describe()["mode"], "LOCAL MODE")
+        t.check("LOCAL MODE is reported as not enabled", auth.enabled() is False)
+
+        t.raises("a short password is refused", ValueError,
+                 lambda: auth.set_password("short"))
+        t.raises("an empty password is refused", ValueError,
+                 lambda: auth.set_password(""))
+
+        auth.set_password("a-long-enough-secret")
+        t.equals("setting a password closes the gate",
+                 auth.describe()["mode"], "PASSWORD REQUIRED")
+        t.check("the right password verifies", auth.verify("a-long-enough-secret"))
+        t.check("a wrong password does not", not auth.verify("wrong-password-x"))
+        t.check("an empty password does not", not auth.verify(""))
+
+        # The stored file must never contain the secret in any recoverable form.
+        raw = path.read_text(encoding="utf-8")
+        t.check("the plaintext password is not stored",
+                "a-long-enough-secret" not in raw)
+        record = json.loads(raw)
+        t.check("a per-install salt is stored", len(record.get("salt", "")) > 10)
+        t.check("the iteration count is recorded",
+                record.get("iterations", 0) >= 200_000)
+
+        # Sessions.
+        token = auth.issue()
+        t.check("a fresh session is valid", auth.valid(token))
+        t.check("a made-up token is not", not auth.valid("not-a-real-token"))
+        t.check("an absent token is not", not auth.valid(None))
+        auth.revoke(token)
+        t.check("a revoked session stops working", not auth.valid(token))
+
+        second = auth.issue()
+        auth.set_password("another-long-secret")
+        t.check("changing the password invalidates old sessions",
+                not auth.valid(second))
+
+        # Rate limiting: an attacker gets a bounded number of guesses.
+        for _ in range(12):
+            auth.verify("guessing", source="10.0.0.9")
+        t.check("repeated failures are rate limited",
+                not auth.verify("another-long-secret", source="10.0.0.9"),
+                "the correct password should be refused while throttled")
+        t.check("throttling is per source, not global",
+                auth.verify("another-long-secret", source="10.0.0.10"))
+
+    # The launcher must refuse to serve the vault to a network unprotected.
+    run_py = (pathlib.Path(__file__).resolve().parents[1] / "run.py").read_text(
+        encoding="utf-8")
+    t.check("run.py refuses a public bind without a password",
+            "REFUSED" in run_py and "exposes the canonical vault" in run_py)
+
+    server_py = (pathlib.Path(__file__).resolve().parents[1] / "kavi"
+                 / "server.py").read_text(encoding="utf-8")
+    t.check("the session cookie is HttpOnly", "HttpOnly" in server_py)
+    t.check("the session cookie is SameSite=Strict", "SameSite=Strict" in server_py)
+    t.check("the app shell is not served to strangers",
+            'OPEN_STATIC = ("/login.html"' in server_py)
+    t.check("wrong password and throttling share one message",
+            "wrong password, or too many attempts" in server_py)
+
+    auth_py = (pathlib.Path(__file__).resolve().parents[1] / "kavi"
+               / "infrastructure" / "auth.py").read_text(encoding="utf-8")
+    t.check("secrets are compared in constant time",
+            "compare_digest" in auth_py)
+    t.check("the password hash is salted PBKDF2",
+            "pbkdf2_hmac" in auth_py)
+    t.check("the password is never printed", "print(" not in auth_py)
+
+
 def body(t):
     body_core(t)
     body_functionalization(t)
@@ -872,6 +955,7 @@ def body(t):
     body_vecyra_program(t)
     body_telemetry(t)
     body_kavi_programme(t)
+    body_auth(t)
 
 
 if __name__ == "__main__":

@@ -19,6 +19,7 @@ INFRA-PRIVATE.md
 tools/push_telegram_token.sh
 tools/push_kimi_key.sh
 KAVI Cockpit (engine room).bat
+BUKA KAVI COCKPIT.bat
 
 # Python
 __pycache__/

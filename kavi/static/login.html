@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAVI — Sign in</title>
+<link rel="icon" href="/logo.svg">
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/base.css">
+<style>
+  body { display: grid; place-items: center; min-height: 100vh; margin: 0; }
+  .gate { width: min(92vw, 380px); }
+  .gate h1 { font-size: 1.15rem; margin: 0 0 .25rem; letter-spacing: .01em; }
+  .gate p.sub { color: var(--muted); margin: 0 0 1.5rem; font-size: .85rem; }
+  .gate label { display: block; font-size: .78rem; color: var(--muted);
+                margin-bottom: .4rem; text-transform: uppercase;
+                letter-spacing: .06em; }
+  .gate input { width: 100%; padding: .7rem .8rem; box-sizing: border-box;
+                background: var(--surface-2); color: var(--text);
+                border: 1px solid var(--line); border-radius: 6px;
+                font-size: .95rem; font-family: inherit; }
+  .gate input:focus { outline: none; border-color: var(--accent); }
+  .gate button { width: 100%; margin-top: .9rem; padding: .7rem;
+                 background: var(--accent); color: #10100f; border: 0;
+                 border-radius: 6px; font-weight: 600; font-size: .9rem;
+                 cursor: pointer; font-family: inherit; }
+  .gate button:disabled { opacity: .55; cursor: default; }
+  .err { margin-top: .9rem; padding: .6rem .75rem; border-radius: 6px;
+         font-size: .82rem; background: rgba(190,70,60,.14);
+         border: 1px solid rgba(190,70,60,.4); color: #e8a49c; display: none; }
+  .mark { display: flex; align-items: center; gap: .6rem; margin-bottom: 1.4rem; }
+  .mark img { width: 30px; height: 30px; }
+  .mark span { font-weight: 600; letter-spacing: .12em; font-size: .95rem; }
+  .foot { margin-top: 1.6rem; font-size: .74rem; color: var(--muted);
+          line-height: 1.55; }
+</style>
+</head>
+<body>
+  <main class="gate">
+    <div class="mark">
+      <img src="/logo.svg" alt="">
+      <span>KAVI</span>
+    </div>
+
+    <h1>Founder cockpit</h1>
+    <p class="sub">This cockpit reads the canonical vault. One password, one person.</p>
+
+    <form id="form" autocomplete="off">
+      <label for="pw">Password</label>
+      <input id="pw" type="password" autocomplete="current-password" autofocus>
+      <button id="go" type="submit">Sign in</button>
+    </form>
+
+    <div class="err" id="err"></div>
+
+    <p class="foot" id="foot"></p>
+  </main>
+
+<script type="module">
+const form = document.getElementById('form');
+const pw   = document.getElementById('pw');
+const go   = document.getElementById('go');
+const err  = document.getElementById('err');
+
+// If no password is set the cockpit is in LOCAL MODE and this page is
+// pointless -- say so rather than demanding a secret that does not exist.
+try {
+  const res = await fetch('/api/auth/status');
+  const status = await res.json();
+  if (!status.enabled) {
+    document.getElementById('foot').textContent =
+      'LOCAL MODE: no password is set, so no sign-in is needed. ' +
+      'That is only safe on 127.0.0.1.';
+    form.style.display = 'none';
+    setTimeout(() => { location.href = '/'; }, 1800);
+  } else {
+    document.getElementById('foot').textContent =
+      'Sessions last 14 days. Too many wrong attempts pauses sign-in for 15 minutes.';
+  }
+} catch (e) { /* offline; the form still works */ }
+
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  err.style.display = 'none';
+  go.disabled = true;
+  go.textContent = 'Checking…';
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw.value }),
+    });
+    if (res.ok) {
+      location.href = '/';
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    err.textContent = data.error || 'Sign-in failed.';
+    err.style.display = 'block';
+  } catch (e) {
+    err.textContent = 'Cannot reach the cockpit.';
+    err.style.display = 'block';
+  }
+  pw.value = '';
+  pw.focus();
+  go.disabled = false;
+  go.textContent = 'Sign in';
+});
+</script>
+</body>
+</html>

@@ -22,10 +22,39 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-fixtures", action="store_true", help="Hide development fixture data")
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument(
+        "--set-password", action="store_true",
+        help="Set or change the cockpit password, then exit. Required before "
+             "binding to anything other than 127.0.0.1.")
+    parser.add_argument(
         "--execution", default="hermes", choices=("null", "hermes", "ssh"),
         help="Which runtime the Run button may use. 'null' refuses everything.",
     )
     args = parser.parse_args(argv)
+
+    from kavi.infrastructure.auth import Auth
+    auth = Auth()
+
+    if args.set_password:
+        import getpass
+        first = getpass.getpass("New cockpit password (min 10 chars): ")
+        if first != getpass.getpass("Repeat it: "):
+            print("They do not match. Nothing was changed.")
+            return 1
+        try:
+            auth.set_password(first)
+        except ValueError as error:
+            print(f"Refused: {error}")
+            return 1
+        print("Password set. Existing sessions were invalidated.")
+        return 0
+
+    # Refuse to serve the vault to a network without a password. This is the
+    # whole reason the cockpit was loopback-only until now.
+    if args.host not in ("127.0.0.1", "localhost", "::1") and not auth.enabled():
+        print(f"REFUSED: binding to {args.host} exposes the canonical vault "
+              "with no password.")
+        print("Set one first:  python run.py --set-password")
+        return 1
 
     service = build_service(
         data_path=args.data,
@@ -38,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
     from kavi.server import create_server
 
     try:
-        server = create_server(router, args.host, args.port)
+        server = create_server(router, args.host, args.port, auth=auth)
     except OSError as exc:
         print(f"cannot bind {args.host}:{args.port} — {exc}", file=sys.stderr)
         return 1

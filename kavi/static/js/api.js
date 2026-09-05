@@ -13,6 +13,12 @@ async function request(method, path, body) {
   } catch {
     throw new Error(`${response.status} — malformed response`);
   }
+  if (response.status === 401) {
+    // The session expired or was revoked. Send him to the gate rather than
+    // rendering empty panels that look like data loss.
+    location.href = '/login.html';
+    throw new Error('authentication required');
+  }
   if (!response.ok) throw new Error(payload.error || `${response.status}`);
   return payload;
 }

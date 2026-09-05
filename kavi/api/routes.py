@@ -197,6 +197,11 @@ def build_router(service: CockpitService) -> Router:
 
     # ------------------------------------------------------- vecyra program
 
+    @router.get("/api/auth/status")
+    def auth_status(query: dict[str, Any], body: dict[str, Any]) -> Any:
+        from kavi.infrastructure.auth import Auth
+        return Auth().describe()
+
     @router.get("/api/programme")
     def programme(query: dict[str, Any], body: dict[str, Any]) -> Any:
         return service.kavi_programme()
