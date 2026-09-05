@@ -1,0 +1,31 @@
+# Local operational data — never belongs in the repository.
+kavi.json
+kavi.json.bak
+*.bak
+runs/
+docs/screenshots/*.tmp
+
+# Anything holding a credential or a server address.
+*.env
+.env.*
+secrets*
+*token*
+*credential*
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+INFRA-PRIVATE.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editor / OS noise
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -4,12 +4,16 @@ Server ini adalah **engine room**, bukan cockpit. Sesuai D-003:
 cockpit tetap berjalan lokal di laptop Founder; VPS hanya untuk kerja yang
 harus jalan terus-menerus.
 
+> Alamat server sengaja tidak ditulis di repositori ini. Repo boleh saja
+> privat hari ini, tetapi alamat infrastruktur tidak perlu ikut berpindah
+> setiap kali kode dibagikan atau di-clone. Catat di tempat lain.
+
 ## Akses
 
 | Item | Nilai |
 |---|---|
-| Host | `srv1957149.hstgr.cloud` |
-| IP | `72.62.127.35` |
+| Host | recorded outside this repository (see local notes) |
+| IP | recorded outside this repository |
 | OS | Ubuntu 24.04.4 LTS |
 | User | `kavi` (sudo, tanpa password) |
 | Kunci privat | `C:\Users\abdul.kausar\.ssh\kavi_vps` |
@@ -19,7 +23,7 @@ harus jalan terus-menerus.
 Masuk:
 
 ```bash
-ssh -i ~/.ssh/kavi_vps kavi@72.62.127.35
+ssh -i ~/.ssh/kavi_vps kavi@<vps-host>
 ```
 
 Kunci privat tidak pernah meninggalkan laptop ini. Jangan pernah menempelkannya
@@ -76,5 +80,5 @@ Prasyarat sebelum KAVI Desktop boleh naik ke VPS:
 ## Verifikasi ulang kapan saja
 
 ```bash
-ssh -i ~/.ssh/kavi_vps kavi@72.62.127.35 "sudo sshd -T | grep -E 'permitrootlogin|passwordauthentication|allowusers'; sudo ufw status; sudo fail2ban-client status sshd"
+ssh -i ~/.ssh/kavi_vps kavi@<vps-host> "sudo sshd -T | grep -E 'permitrootlogin|passwordauthentication|allowusers'; sudo ufw status; sudo fail2ban-client status sshd"
 ```
