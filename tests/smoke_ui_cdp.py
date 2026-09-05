@@ -175,11 +175,11 @@ def body(t) -> None:
         )
         # The rail shows plain-language names that can be translated, so assert
         # that all nine modules are present rather than pinning wording.
-        for expected in ("Command", "Decisions for You", "Objectives & Work", "Ventures",
+        for expected in ("Command", "Ask KAVI", "Decisions for You", "Objectives & Work", "Ventures",
                          "Organization", "Company Knowledge", "Metrics & Cost",
                          "Decision Record", "Authority & Limits"):
             t.check(f"rail lists {expected}", expected in nav, str(nav))
-        t.equals("rail has exactly nine modules", len(nav), 9)
+        t.equals("rail has exactly ten modules", len(nav), 10)
 
         founder = ws.evaluate("document.querySelector('.rail-foot').innerText.replace(/\\n/g,' ')")
         t.check("founder identity shown", "Founder" in founder, founder)
@@ -308,7 +308,21 @@ def body(t) -> None:
         t.check("metrics reports UNKNOWN revenue", "UNKNOWN" in metrics_text)
         t.check("metrics separates fixture and local",
                 "FIXTURE" in metrics_text.upper() and "LOCAL" in metrics_text.upper())
-        t.check("metrics has no fabricated currency", "$" not in metrics_text, metrics_text[:200])
+        # Sourced currency figures quoted from the evidence register are
+        # legitimate. What must never appear is an invented KAVI cost or
+        # revenue figure, so check the economics panels specifically.
+        economics = ws.evaluate("""(() => {
+          const wanted = ['Runtime economics', 'Company economics', 'Engine Room'];
+          return Array.from(document.querySelectorAll('.panel'))
+            .filter(p => wanted.some(w => (p.textContent || '').includes(w)))
+            .map(p => p.innerText).join('\\n');
+        })()""")
+        import re as _re
+        invented = _re.findall(r"\$\s?\d", economics)
+        t.check("no invented cost or revenue figure is shown",
+                not invented, str(invented[:5]))
+        t.check("cost is reported as unavailable, not as a number",
+                "UNAVAILABLE" in economics.upper() or "NOT MEASURED" in economics.upper())
 
         t.equals("key 8 opens Decision Log", open_module("8"), "Decision Record")
         decision_text = ws.evaluate("document.querySelector('.screen-body').innerText")
@@ -336,7 +350,11 @@ def body(t) -> None:
         t.check("service account cannot approve", "Service Account" in auth_text)
         t.check("grants listed", "GNT-" in auth_text)
         t.check("revoked grant visible", "REVOKED" in auth_text)
-        t.check("execution adapter shown", "null" in auth_text.lower())
+        # Whichever adapter is wired, the Authority screen must name it, so the
+        # Founder can always see what could execute on his behalf.
+        t.check("execution adapter is named",
+                any(name in auth_text.upper() for name in ("NONE", "HERMES")),
+                auth_text[auth_text.upper().find("ADAPTER"):][:80])
         t.check("providers all not connected",
                 auth_text.count("NOT CONNECTED") >= 5, str(auth_text.count("NOT CONNECTED")))
 

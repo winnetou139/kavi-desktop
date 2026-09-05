@@ -45,6 +45,11 @@ const STRINGS = {
     en: 'Start here · give KAVI an objective',
     id: 'Mulai di sini · beri KAVI satu tujuan',
   },
+  'nav.ask': { en: 'Ask KAVI', id: 'Minta KAVI' },
+  'nav.ask.sub': {
+    en: 'Send work to the connected runtime',
+    id: 'Kirim pekerjaan ke runtime yang terhubung',
+  },
   'nav.inbox': { en: 'Decisions for You', id: 'Keputusan untuk Anda' },
   'nav.inbox.sub': {
     en: 'Things waiting for your judgement',

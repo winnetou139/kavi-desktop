@@ -1,6 +1,6 @@
 // Metrics & Cost — reports what is measured, and says so when nothing is.
 import { api } from '../api.js';
-import { el, chip, panel, kv, notice, valueOr } from '../ui.js';
+import { el, chip, panel, kv, notice, valueOr, toast } from '../ui.js';
 import { t as tr } from '../i18n.js';
 
 export const meta = {
@@ -163,6 +163,7 @@ export async function render(host, ctx) {
       el('div', { class: 'cols-eq' }, [classRows, confidenceRows]),
     ])),
     panel('Record origin', [], recordRows),
+    evidencePanel(evidenceData),
     panel('Where state is stored', [], el('div', { class: 'panel-body' }, [
       kv([
         ['Local operational store', storage.operational_store.path],
@@ -182,4 +183,82 @@ function toneForRuntime(value) {
   if (v.includes('NOT CONNECTED') || v.includes('NOT ACTIVE')) return 'amber';
   if (v.includes('UNAVAILABLE') || v.includes('NOT MEASURED')) return 'amber';
   return 'muted';
+}
+
+/**
+ * Every claim, clickable. Pressing a row reveals the caveat that came with it.
+ * A claim without its limitation is how a register quietly becomes misleading,
+ * so the caveat is never more than one click away.
+ */
+function evidencePanel(evidenceData) {
+  const claims = evidenceData.evidence || [];
+  if (!claims.length) return el('div', {});
+
+  const detail = el('div', { class: 'claim-detail' });
+  const showClaim = (claim) => {
+    detail.innerHTML = '';
+    detail.appendChild(el('div', { class: 'run-head' }, [
+      el('span', { class: 'mono', text: claim.id }),
+      chip(claim.classification,
+        claim.classification === 'FACT' ? 'mint'
+          : claim.classification === 'UNKNOWN' ? 'red' : 'amber'),
+      claim.confidence ? chip(claim.confidence, 'muted') : null,
+      claim.kind ? chip(claim.kind, 'muted') : null,
+    ]));
+    detail.appendChild(el('div', { class: 'run-detail', text: claim.claim }));
+    detail.appendChild(el('table', { class: 'grid' }, [
+      el('tbody', {}, [
+        claim.source ? kvRow('Source', claim.source) : null,
+        claim.source_date ? kvRow('Source date', claim.source_date) : null,
+        claim.locator ? kvRow('Locator', claim.locator) : null,
+        claim.access_date ? kvRow('Checked on', claim.access_date) : null,
+        claim.freshness ? kvRow('Freshness', claim.freshness) : null,
+        claim.contradiction
+          ? kvRow('Caveat or contradiction', claim.contradiction, 'caveat')
+          : kvRow('Caveat or contradiction', 'None recorded.'),
+      ].filter(Boolean)),
+    ]));
+  };
+
+  const table = el('table', { class: 'grid' }, [
+    el('thead', {}, [el('tr', {}, [
+      el('th', { text: 'ID' }), el('th', { text: 'Claim' }),
+      el('th', { text: 'Class' }), el('th', { text: 'Confidence' }),
+      el('th', { text: 'Caveat' }),
+    ])]),
+    el('tbody', {}, claims.map((claim) => el('tr', {
+      class: 'clickable',
+      'data-claim': claim.id,
+      title: 'Open this claim',
+      onclick: () => showClaim(claim),
+    }, [
+      el('td', {}, [el('span', { class: 'mono', text: claim.id })]),
+      el('td', { class: 'claim-text', text: claim.claim }),
+      el('td', {}, [chip(claim.classification,
+        claim.classification === 'FACT' ? 'mint'
+          : claim.classification === 'UNKNOWN' ? 'red' : 'amber')]),
+      el('td', {}, [claim.confidence ? chip(claim.confidence, 'muted') : el('span', { text: '—' })]),
+      el('td', {}, [claim.contradiction
+        ? chip('YES', 'amber')
+        : el('span', { class: 'muted', text: '—' })]),
+    ]))),
+  ]);
+
+  if (claims.length) showClaim(claims[0]);
+
+  return panel(
+    `Evidence — every claim (${claims.length})`,
+    [chip('CLICK A ROW', 'muted')],
+    el('div', {}, [
+      el('div', { class: 'claim-scroll' }, [table]),
+      detail,
+    ]),
+  );
+}
+
+function kvRow(label, value, cls = '') {
+  return el('tr', {}, [
+    el('td', { class: 'er-label' }, [el('div', { class: 'er-name', text: label })]),
+    el('td', { class: cls, text: String(value) }),
+  ]);
 }

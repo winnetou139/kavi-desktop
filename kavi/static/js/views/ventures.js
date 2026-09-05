@@ -1,6 +1,6 @@
 // Ventures — lifecycle and gate position. KAVI may never advance a gate itself.
 import { api } from '../api.js';
-import { el, chip, originChip, panel, kv, notice, valueOr } from '../ui.js';
+import { el, chip, originChip, panel, kv, notice, valueOr, toast } from '../ui.js';
 
 export const meta = {
   id: 'ventures',
@@ -29,7 +29,18 @@ export async function render(host, ctx) {
   for (const venture of ventures) {
     const gates = el('div', { class: 'gates' });
     for (const gate of venture.gates || []) {
-      gates.appendChild(el('div', { class: `gate ${gate.position}` }, [
+      gates.appendChild(el('button', {
+        class: `gate ${gate.position}`,
+        type: 'button',
+        'data-gate': gate.gate,
+        title: `${gate.gate} — ${gate.name}`,
+        onclick: () => toast(
+          `<b>${gate.gate}</b> — ${gate.name}. ` +
+          (gate.position === 'current'
+            ? `Current gate: <b>${venture.gate_status}</b>. KAVI may not advance it.`
+            : gate.position === 'past' ? 'Already passed.' : 'Not reached yet.'),
+        ),
+      }, [
         gate.position === 'current'
           ? el('div', { class: 'marker', text: venture.gate_status })
           : null,

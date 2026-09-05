@@ -111,7 +111,25 @@ def body(t) -> None:
     t.check("execution defines a capability interface", "class ExecutionCapability" in execution)
     t.check("null adapter exists", "class NullExecutionAdapter" in execution)
     t.check("hermes adapter is declared", "class HermesExecutionAdapter" in execution)
-    t.check("hermes adapter is not implemented", "not implemented in v0.1" in execution)
+    # The Hermes adapter is now real. What must stay true is that it cannot run
+    # anything on its own: every run is started explicitly by the Founder.
+    t.check("hermes adapter is implemented", "subprocess.run" in execution)
+    t.check("every run is bounded by a timeout", "timeout=limit" in execution)
+    t.check("there is a hard timeout ceiling", "MAX_TIMEOUT" in execution)
+    t.check("every run leaves a transcript", "_write_transcript" in execution)
+    # Check for real capability, not for the words. Comments legitimately
+    # mention "scheduled" and "vault" while promising the opposite.
+    import re as _re
+    code_only = _re.sub(r'"""..*?"""', "", execution, flags=_re.DOTALL)
+    code_only = _re.sub(r"#.*", "", code_only)
+    t.check("the adapter starts no timers or schedules",
+            "sched.scheduler" not in code_only and "Timer(" not in code_only)
+    t.check("the adapter opens no vault path",
+            "VaultReader" not in code_only and "08_DECISIONS" not in code_only)
+    t.check("a run needs an explicit call, never a loop",
+            "while True" not in code_only)
+    t.check("a missing runtime is declined, not faked",
+            'state="DECLINED"' in execution)
 
     # Nothing outside infrastructure may import a concrete adapter.
     for path in list((KAVI / "application").glob("*.py")) + list((KAVI / "api").glob("*.py")):

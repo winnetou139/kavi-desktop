@@ -21,12 +21,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data", default=None, help="Path to the local store JSON file")
     parser.add_argument("--no-fixtures", action="store_true", help="Hide development fixture data")
     parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument(
+        "--execution", default="hermes", choices=("null", "hermes"),
+        help="Which runtime the Run button may use. 'null' refuses everything.",
+    )
     args = parser.parse_args(argv)
 
     service = build_service(
         data_path=args.data,
         vault_path=args.vault,
         include_fixtures=not args.no_fixtures,
+        execution_adapter=args.execution,
     )
     router = build_router(service)
 

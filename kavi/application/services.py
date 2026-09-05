@@ -8,6 +8,7 @@ is enforced here or in the domain layer.
 from __future__ import annotations
 
 import dataclasses
+import threading
 import datetime as _dt
 from typing import Any
 
@@ -46,6 +47,9 @@ class CockpitService:
         self.runtime = runtime
         self.vault = vault
         self.execution = execution
+        # Runs started from the cockpit, so their result can be polled.
+        self._runs: dict[str, Any] = {}
+        self._runs_lock = threading.Lock()
 
     # ------------------------------------------------------------- identity
 
@@ -295,6 +299,41 @@ class CockpitService:
             )
         )
         return result.to_dict()
+
+    # ------------------------------------------------------------ execution
+
+    def execution_status(self) -> dict[str, Any]:
+        return self.execution.describe()
+
+    def run_prompt(self, prompt: str, *, timeout: int | None = None) -> dict[str, Any]:
+        """Ask the connected runtime to do something, started by the Founder.
+
+        Nothing here is scheduled or automatic. A run happens only because the
+        Founder pressed Run, and the result — including failure — is recorded
+        exactly as it came back.
+        """
+        prompt = (prompt or "").strip()
+        if not prompt:
+            raise UseCaseError("Write what you want done before running it.")
+        result = self.execution.submit(
+            ExecutionRequest(instruction=prompt, timeout=timeout)
+        )
+        with self._runs_lock:
+            self._runs[result.run_id] = result
+        return result.to_dict()
+
+    def run_status(self, run_id: str) -> dict[str, Any]:
+        with self._runs_lock:
+            result = self._runs.get(run_id)
+        if result is None:
+            raise UseCaseError(f"No run called {run_id} was started from here.")
+        return result.to_dict()
+
+    def recent_runs(self, limit: int = 20) -> list[dict[str, Any]]:
+        with self._runs_lock:
+            rows = [r.to_dict() for r in self._runs.values()]
+        rows.sort(key=lambda row: row.get("started_at", ""), reverse=True)
+        return rows[:limit]
 
     # -------------------------------------------------------------- inbox
 

@@ -124,6 +124,27 @@ def build_router(service: CockpitService) -> Router:
             note=str(body.get("note", "")),
         )
 
+    # ---------------------------------------------------------- execution
+
+    @router.get("/api/execution")
+    def execution(query: dict[str, Any], body: dict[str, Any]) -> Any:
+        return {
+            "status": service.execution_status(),
+            "runs": service.recent_runs(),
+        }
+
+    @router.post("/api/execution/run")
+    def execution_run(query: dict[str, Any], body: dict[str, Any]) -> Any:
+        timeout = body.get("timeout")
+        return service.run_prompt(
+            str(body.get("prompt", "")),
+            timeout=int(timeout) if timeout else None,
+        )
+
+    @router.get("/api/execution/status")
+    def execution_status(query: dict[str, Any], body: dict[str, Any]) -> Any:
+        return service.run_status(str(query.get("run_id", "")))
+
     @router.get("/api/storage")
     def storage(query: dict[str, Any], body: dict[str, Any]) -> Any:
         return service.storage_info()

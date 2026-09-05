@@ -33,6 +33,7 @@ OFFLINE_SUITES = (
 # Suites that drive a real browser against a real server.
 BROWSER_SUITES = (
     "tests/smoke_ui_cdp.py",
+    "tests/smoke_interaction.py",
     "tests/acceptance_v01.py",
 )
 
@@ -85,7 +86,8 @@ def main() -> int:
             server_env = dict(base_env)
             server_env["KAVI_DATA_DIR"] = str(scratch)
             server = subprocess.Popen(
-                [sys.executable, "run.py", "--port", str(TEST_PORT), "--no-browser"],
+                [sys.executable, "run.py", "--port", str(TEST_PORT), "--no-browser",
+                 "--execution", "hermes"],
                 cwd=str(ROOT), env=server_env,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )

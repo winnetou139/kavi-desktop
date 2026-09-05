@@ -105,7 +105,8 @@ def body_core(t) -> None:
 
     # ------------------------------------------------------------ dispatch
     result = service.dispatch_task(task["id"])
-    t.equals("dispatch declined in LOCAL MODE", result["accepted"], False)
+    t.check("dispatch is never silently accepted",
+            result["state"] in ("DECLINED", "RUNNING", "FAILED"), result["state"])
     t.equals("dispatch state DECLINED", result["state"], "DECLINED")
     t.check("dispatch explains itself", len(result["detail"]) > 20)
 

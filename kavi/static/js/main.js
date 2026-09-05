@@ -5,6 +5,7 @@ import { t as tr, both, initLanguage, language, setLanguage, LANGUAGES } from '.
 
 import * as command from './views/command.js';
 import * as inbox from './views/inbox.js';
+import * as ask from './views/ask.js';
 import * as objectives from './views/objectives.js';
 import * as ventures from './views/ventures.js';
 import * as organization from './views/organization.js';
@@ -13,7 +14,7 @@ import * as metrics from './views/metrics.js';
 import * as decisions from './views/decisions.js';
 import * as authority from './views/authority.js';
 
-const VIEWS = [command, inbox, objectives, ventures, organization, memory, metrics, decisions, authority];
+const VIEWS = [command, ask, inbox, objectives, ventures, organization, memory, metrics, decisions, authority];
 const RAIL_GROUPS = ['FOUNDER', 'WORK', 'COMPANY'];
 
 // A module whose group is not a real rail group would silently vanish from the

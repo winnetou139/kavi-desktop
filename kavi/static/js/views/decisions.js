@@ -101,7 +101,13 @@ export async function render(host, ctx) {
       'data-decision-id': decision.id,
       onclick: () => {
         openId = decision.id === openId ? null : decision.id;
-        ctx.reload();
+        // Redraw only the detail panel. Reloading the whole screen would
+        // rebuild the table and lose the selection the Founder just made.
+        drawDetail();
+        for (const other of table.querySelectorAll('tr[data-decision-id]')) {
+          other.classList.toggle('sel', other.dataset.decisionId === openId);
+        }
+        detailHost.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       },
     }, [
       el('td', {}, [el('span', { class: 'mono', text: decision.id })]),

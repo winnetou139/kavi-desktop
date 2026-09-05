@@ -29,6 +29,10 @@ export const api = {
   authority: () => request('GET', '/api/authority'),
   storage: () => request('GET', '/api/storage'),
 
+  execution: () => request('GET', '/api/execution'),
+  runPrompt: (prompt, timeout) => request('POST', '/api/execution/run', { prompt, timeout }),
+  runStatus: (runId) => request('GET', `/api/execution/status${qs({ run_id: runId })}`),
+
   objectives: () => request('GET', '/api/objectives'),
   objective: (id) => request('GET', `/api/objective${qs({ id })}`),
   createObjective: (payload) => request('POST', '/api/objectives/create', payload),
