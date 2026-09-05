@@ -86,12 +86,16 @@ def render(data: dict, telegram: bool = False) -> str:
         lines += ["VECYRA BUILD", "  product repo not reachable — phase UNKNOWN", ""]
     else:
         gate = program.get("gate", {})
+        scope = str(program.get("current_scope", UNKNOWN))
+        # Keep the first clause only: the full roadmap sentence is long and
+        # slicing it mid-word looks like a defect on a phone.
+        short = scope.split(",")[0].strip()
         lines += [
             f"{b}VECYRA BUILD{b}",
             f"  Phase now : {program.get('current_phase', UNKNOWN)}",
-            f"  Scope     : {str(program.get('current_scope', UNKNOWN))[:60]}",
+            f"  Scope     : {short}",
             f"  {gate.get('name', 'GATE')} : {gate.get('status', UNKNOWN)}"
-            f"  (as of {gate.get('as_of', UNKNOWN)})",
+            f" (as of {gate.get('as_of', UNKNOWN)})",
             "",
         ]
         for phase in program.get("phases", []):
