@@ -16,6 +16,7 @@ secrets*
 id_rsa*
 id_ed25519*
 INFRA-PRIVATE.md
+tools/push_kimi_key.sh
 KAVI Cockpit (engine room).bat
 
 # Python
