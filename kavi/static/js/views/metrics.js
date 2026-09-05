@@ -16,6 +16,10 @@ export async function render(host, ctx) {
   const metrics = await api.metrics();
   const runtime = await api.runtime();
   const storage = await api.storage();
+
+  // Execution telemetry and the economic ledger (brief sections 10 and 15).
+  let ledgerData = null;
+  try { ledgerData = await api.ledger(); } catch (e) { ledgerData = null; }
   const evidenceData = await api.evidence();
   const evidence = metrics.evidence;
   const evStatus = evidenceData.status || {};
@@ -113,7 +117,58 @@ export async function render(host, ctx) {
     ]))),
   ]);
 
+  // ---- Execution telemetry + economic ledger --------------------------
+  const L = (ledgerData && ledgerData.ledger) || null;
+  const runRows = (ledgerData && ledgerData.runs) || [];
+  const ledgerBody = el('div', { class: 'panel-body' });
+  if (L) {
+    ledgerBody.appendChild(kv([
+      ['Runs recorded', String(L.runs ?? 0)],
+      ['Succeeded / failed', `${L.succeeded ?? 0} / ${L.failed ?? 0}`],
+      ['Success rate', L.success_rate == null
+        ? 'NOT MEASURED' : `${Math.round(L.success_rate * 100)}%`],
+      ['Active time total', L.active_seconds_total == null
+        ? 'NOT MEASURED' : `${L.active_seconds_total}s`],
+      ['Active time median', L.active_seconds_median == null
+        ? 'NOT MEASURED' : `${L.active_seconds_median}s`],
+      ['Tokens', L.tokens_total == null
+        ? 'NOT REPORTED by the transport' : String(L.tokens_total)],
+      ['Cost basis', L.cost_basis || 'UNKNOWN'],
+      ['Cost', L.cost_idr == null ? 'NOT METERED' : String(L.cost_idr)],
+      ['Quality scored by KAVI', String(L.quality_scored ?? 0)],
+    ]));
+    if (runRows.length) {
+      const table = el('table', { class: 'tbl' });
+      const head = el('tr');
+      for (const label of ['Run', 'Adapter', 'Model', 'State', 'Active', 'Trigger']) {
+        head.appendChild(el('th', { text: label }));
+      }
+      table.appendChild(head);
+      for (const run of runRows.slice(0, 12)) {
+        const row = el('tr');
+        row.appendChild(el('td', { text: run.run_id || '—' }));
+        row.appendChild(el('td', { text: run.adapter || '—' }));
+        row.appendChild(el('td', { text: run.model || 'UNKNOWN' }));
+        row.appendChild(el('td', { text: run.state || 'UNKNOWN' }));
+        row.appendChild(el('td', { text: run.active_seconds == null
+          ? 'NOT MEASURED' : `${run.active_seconds}s` }));
+        row.appendChild(el('td', { text: run.trigger || 'UNKNOWN' }));
+        table.appendChild(row);
+      }
+      ledgerBody.appendChild(table);
+    } else {
+      ledgerBody.appendChild(el('div', { class: 'empty' }, [
+        el('b', { text: 'No runs recorded yet' }),
+      ]));
+    }
+    ledgerBody.appendChild(notice(
+      L.detail || 'Cost per run is not metered.', 'amber'));
+  } else {
+    ledgerBody.appendChild(notice('Telemetry is unavailable.', 'amber'));
+  }
+
   host.appendChild(el('div', { class: 'stack' }, [
+    panel('Execution telemetry & economic ledger', [], ledgerBody),
     panel('Engine Room', [chip(runtime.label, 'amber')], el('div', { class: 'panel-body' }, [
       engineRoom,
       el('div', { class: 'engine-room-note' },

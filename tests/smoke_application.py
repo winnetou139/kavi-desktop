@@ -729,6 +729,83 @@ def body_vecyra_program(t):
                 forbidden not in source)
 
 
+# --------------------------------------- telemetry and the economic ledger
+
+
+def body_telemetry(t):
+    """Telemetry must measure what happened and refuse to price what it cannot."""
+    import tempfile
+    from kavi.infrastructure.telemetry import (
+        TelemetryLog, RunRecord, NOT_METERED)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        log = TelemetryLog(path=pathlib.Path(tmp) / "t.jsonl")
+
+        empty = log.ledger()
+        t.equals("an empty ledger reports no runs", empty["runs"], 0)
+        t.equals("an empty ledger still refuses to price a run",
+                 empty["cost_basis"], NOT_METERED)
+        t.check("an empty ledger has no cost figure", empty["cost_idr"] is None)
+
+        log.record(RunRecord(run_id="R1", adapter="SSH", model="kimi-k3",
+                             state="SUCCEEDED", exit_code=0,
+                             started_at="2026-09-05T10:00:00",
+                             finished_at="2026-09-05T10:00:40"))
+        log.record(RunRecord(run_id="R2", adapter="SSH", model="kimi-k3",
+                             state="FAILED", exit_code=1, failures=1,
+                             started_at="2026-09-05T11:00:00",
+                             finished_at="2026-09-05T11:00:20"))
+
+        rows = log.rows()
+        t.equals("both runs were recorded", len(rows), 2)
+        t.equals("duration is derived from the timestamps",
+                 rows[0]["active_seconds"], 40.0)
+
+        ledger = log.ledger()
+        t.equals("the ledger counts every run", ledger["runs"], 2)
+        t.equals("the ledger counts failures honestly", ledger["failed"], 1)
+        t.equals("success rate is measured, not rounded up",
+                 ledger["success_rate"], 0.5)
+        t.equals("total active time is measured",
+                 ledger["active_seconds_total"], 60.0)
+
+        # The whole point: never invent money that was not spent.
+        t.equals("cost basis stays NOT METERED", ledger["cost_basis"], NOT_METERED)
+        t.check("no rupiah figure is invented", ledger["cost_idr"] is None)
+        t.check("tokens are not estimated from characters",
+                ledger["tokens_total"] is None)
+        t.equals("no run claims reported tokens", ledger["tokens_reported_for"], 0)
+        t.equals("quality is not machine-scored", ledger["quality_scored"], 0)
+        t.check("the ledger explains why cost is absent",
+                "subscription" in ledger["detail"].lower())
+
+        # An allocation is permitted, but must never masquerade as measurement.
+        allocated = log.allocate_monthly(1_000_000, "2026-09")
+        t.equals("an allocation is labelled ALLOCATED", allocated["basis"], "ALLOCATED")
+        t.equals("the allocation divides across real runs", allocated["runs"], 2)
+        t.equals("per-run allocation is arithmetic only",
+                 allocated["per_run_idr"], 500000.0)
+        t.check("the allocation says it is not a measured cost",
+                "not a measured cost" in allocated["detail"])
+        t.check("the allocation admits running more costs nothing more",
+                "Running more does not cost more" in allocated["detail"])
+
+        # A month with no runs must not divide by zero or imply a cost.
+        quiet = log.allocate_monthly(1_000_000, "2020-01")
+        t.equals("an empty month allocates nothing", quiet["per_run_idr"], None)
+
+        # A corrupt line must not hide the good ones.
+        with (pathlib.Path(tmp) / "t.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write("{not json\n")
+        t.equals("a corrupt line is skipped, not fatal", len(log.rows()), 2)
+
+    # The source must not contain a hardcoded price anywhere.
+    source = (pathlib.Path(__file__).resolve().parents[1]
+              / "kavi" / "infrastructure" / "telemetry.py").read_text(encoding="utf-8")
+    t.check("no per-token price is hardcoded",
+            "0.000" not in source and "per_token" not in source)
+
+
 def body(t):
     body_core(t)
     body_functionalization(t)
@@ -736,6 +813,7 @@ def body(t):
     body_canonical_evidence(t)
     body_ssh_adapter(t)
     body_vecyra_program(t)
+    body_telemetry(t)
 
 
 if __name__ == "__main__":

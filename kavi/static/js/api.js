@@ -50,6 +50,7 @@ export const api = {
     request('POST', '/api/inbox/decide', { id, disposition, note }),
 
   vecyra: () => get('/api/vecyra'),
+  ledger: () => get('/api/ledger'),
   ventures: () => request('GET', '/api/ventures'),
   venture: (id) => request('GET', `/api/venture${qs({ id })}`),
   organization: () => request('GET', '/api/organization'),

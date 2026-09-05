@@ -201,6 +201,15 @@ def build_router(service: CockpitService) -> Router:
     def vecyra(query: dict[str, Any], body: dict[str, Any]) -> Any:
         return service.vecyra_program()
 
+    # ----------------------------------------------- telemetry and ledger
+
+    @router.get("/api/ledger")
+    def ledger(query: dict[str, Any], body: dict[str, Any]) -> Any:
+        return {
+            "ledger": service.execution_ledger(),
+            "runs": service.execution_runs(50),
+        }
+
     # ------------------------------------------------------------ evidence
 
     @router.get("/api/evidence")

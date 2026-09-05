@@ -30,6 +30,7 @@ from kavi.infrastructure.repository import Repository
 from kavi.infrastructure.runtime_status import RuntimeStatusProvider
 from kavi.infrastructure.vault import VaultReader
 from kavi.infrastructure.vecyra_repo import VecyraReader
+from kavi.infrastructure.telemetry import TelemetryLog
 
 
 class UseCaseError(Exception):
@@ -51,6 +52,8 @@ class CockpitService:
         # Optional so existing callers and tests keep working unchanged.
         self.vecyra = vecyra if vecyra is not None else VecyraReader()
         self.execution = execution
+        # Every run leaves a record. What was not measured stays None.
+        self.telemetry = TelemetryLog()
         # Runs started from the cockpit, so their result can be polled.
         self._runs: dict[str, Any] = {}
         self._runs_lock = threading.Lock()
@@ -319,12 +322,59 @@ class CockpitService:
         prompt = (prompt or "").strip()
         if not prompt:
             raise UseCaseError("Write what you want done before running it.")
+
+        # Telemetry is written when the run finishes, not when it starts, so
+        # the record describes what actually happened rather than an intent.
+        def _on_finish(finished: Any) -> None:
+            self.telemetry.from_result(
+                finished,
+                model=self._active_model(),
+                trigger="FOUNDER",
+                venture="VECYRA",
+            )
+
         result = self.execution.submit(
-            ExecutionRequest(instruction=prompt, timeout=timeout)
+            ExecutionRequest(instruction=prompt, timeout=timeout),
+            on_finish=_on_finish,
         )
         with self._runs_lock:
             self._runs[result.run_id] = result
+        if result.state in ("DECLINED",):
+            # A declined run never calls back, but it is still a fact.
+            self.telemetry.from_result(result, trigger="FOUNDER", venture="VECYRA")
         return result.to_dict()
+
+    def _active_model(self) -> str:
+        """The model actually configured, read rather than assumed."""
+        try:
+            import pathlib
+            config = (pathlib.Path.home() / "AppData" / "Local" / "hermes"
+                      / "config.yaml")
+            if not config.is_file():
+                config = pathlib.Path.home() / ".hermes" / "config.yaml"
+            if not config.is_file():
+                return "UNKNOWN"
+            inside = False
+            for line in config.read_text(encoding="utf-8").splitlines():
+                if line.startswith("model:"):
+                    inside = True
+                    continue
+                if inside:
+                    if line and not line.startswith((" ", "\t")):
+                        break
+                    if line.strip().startswith("default:"):
+                        return line.split(":", 1)[1].strip()
+        except OSError:
+            pass
+        return "UNKNOWN"
+
+    def execution_ledger(self) -> dict[str, Any]:
+        """The economic ledger (§15). Reports only what is knowable."""
+        return self.telemetry.ledger()
+
+    def execution_runs(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Recent runs, newest first, straight from the telemetry log."""
+        return list(reversed(self.telemetry.rows()))[:limit]
 
     def run_status(self, run_id: str) -> dict[str, Any]:
         with self._runs_lock:

@@ -66,11 +66,13 @@ def build() -> dict:
     decisions = _get("/api/decisions")
     objectives = _get("/api/objectives")
     execution = _get("/api/execution")
+    ledger = _get("/api/ledger")
     return {
         "program": program,
         "decisions": decisions,
         "objectives": objectives,
         "execution": execution,
+        "ledger": ledger,
         "cockpit_up": _get("/api/runtime") is not None,
         "at": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
@@ -133,6 +135,22 @@ def render(data: dict, telegram: bool = False) -> str:
             f"{b}ENGINE ROOM{b}",
             f"  Adapter   : {execution.get('adapter', UNKNOWN)}"
             f" · {execution.get('state', UNKNOWN)}",
+            "",
+        ]
+
+    # ---- execution economics -------------------------------------------
+    payload = data.get("ledger") or {}
+    L = payload.get("ledger") if isinstance(payload, dict) else None
+    if L and L.get("runs"):
+        rate = L.get("success_rate")
+        lines += [
+            f"{b}RUNS{b}",
+            f"  Recorded  : {L['runs']}"
+            f" ({L.get('succeeded', 0)} ok, {L.get('failed', 0)} failed)",
+            f"  Success   : {round(rate * 100)}%" if rate is not None
+            else "  Success   : NOT MEASURED",
+            f"  Median    : {L.get('active_seconds_median', 'NOT MEASURED')}s",
+            f"  Cost      : {L.get('cost_basis', UNKNOWN)}",
             "",
         ]
 
