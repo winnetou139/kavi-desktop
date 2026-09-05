@@ -191,10 +191,17 @@ def body(t) -> None:
                 t.check("Hermes actually answered through the cockpit",
                         "KAVI_UI_LINK_OK" in output, output[:120])
                 # History is drawn when the screen renders, so reopen it.
+                # Navigate by clicking the rail: key '0' is not a shortcut.
                 ws.evaluate("document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'1',bubbles:true}))")
                 time.sleep(1.2)
-                open_module("0")
-                time.sleep(1.0)
+                ws.evaluate(
+                    "(() => { const b = Array.from(document.querySelectorAll('.nav-item'))"
+                    ".find(n => /ask kavi/i.test(n.textContent));"
+                    " if (!b) throw new Error('Ask KAVI not in the rail');"
+                    " b.click(); return true; })()"
+                )
+                time.sleep(2.0)
+                t.equals("returned to Ask KAVI", title(), "Ask KAVI")
                 t.check("the run appears in history",
                         ws.evaluate("document.querySelectorAll('.ask-prompt-cell').length") >= 1)
 

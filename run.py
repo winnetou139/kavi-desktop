@@ -22,7 +22,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-fixtures", action="store_true", help="Hide development fixture data")
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument(
-        "--execution", default="hermes", choices=("null", "hermes"),
+        "--execution", default="hermes", choices=("null", "hermes", "ssh"),
         help="Which runtime the Run button may use. 'null' refuses everything.",
     )
     args = parser.parse_args(argv)

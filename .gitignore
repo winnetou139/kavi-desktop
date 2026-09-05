@@ -16,6 +16,7 @@ secrets*
 id_rsa*
 id_ed25519*
 INFRA-PRIVATE.md
+KAVI Cockpit (engine room).bat
 
 # Python
 __pycache__/

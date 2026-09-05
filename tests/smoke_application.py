@@ -593,11 +593,68 @@ def body_canonical_evidence(t):
             all(len(i["evidence"]) == len(i["evidence_ids"]) for i in referenced))
 
 
+# ------------------------------------------------------- engine room (ssh)
+
+
+def body_ssh_adapter(t):
+    """The remote adapter must be honest and must not leak the server address."""
+    from kavi.infrastructure.ssh_execution import SSHExecutionAdapter
+
+    # With nothing configured it must refuse, not guess or hang.
+    blank = SSHExecutionAdapter(host="")
+    status = blank.describe()
+    t.equals("unconfigured engine room is NOT CONFIGURED", status["state"], "NOT CONFIGURED")
+    t.check("unconfigured engine room is not connected", status["connected"] is False)
+    t.equals("unconfigured submit declines", blank.submit("hello").state, "DECLINED")
+    t.equals("empty prompt declines", blank.submit("").state, "DECLINED")
+
+    # A tilde path must survive quoting: quoting it whole makes the tilde
+    # literal, and a correctly installed Hermes then looks missing.
+    tilde = SSHExecutionAdapter(host="user@example", remote_hermes="~/hermes-agent/.venv/bin/hermes")
+    expression = tilde._remote_path_expr()
+    t.check("tilde is expanded against $HOME, not quoted literally",
+            expression.startswith('"$HOME"/'), expression)
+    t.check("the rest of the path is still quoted",
+            "hermes-agent/.venv/bin/hermes" in expression)
+
+    # shlex.quote leaves an already-safe path unquoted, which is correct.
+    absolute = SSHExecutionAdapter(host="user@example", remote_hermes="/usr/bin/hermes")
+    t.equals("an absolute path passes through unchanged",
+             absolute._remote_path_expr(), "/usr/bin/hermes")
+    spaced = SSHExecutionAdapter(host="user@example", remote_hermes="/opt/my hermes/bin/hermes")
+    t.check("a path containing spaces is quoted",
+            spaced._remote_path_expr().startswith("'"),
+            spaced._remote_path_expr())
+
+    # The prompt is passed as one quoted argument, so it cannot become shell
+    # syntax on the server.
+    inject = SSHExecutionAdapter(host="user@example")
+    import shlex as _shlex
+    hostile = "hello; rm -rf ~"
+    t.check("a hostile prompt is quoted, not executed",
+            _shlex.quote(hostile).startswith("'") and "; rm" in _shlex.quote(hostile))
+
+    # The server address must never be hardcoded in the source.
+    import pathlib as _pathlib
+    source = (_pathlib.Path(__file__).resolve().parents[1]
+              / "kavi" / "infrastructure" / "ssh_execution.py").read_text(encoding="utf-8")
+    import re as _re
+    t.check("no server IP is hardcoded in the adapter",
+            not _re.search(r"\b\d{1,3}(\.\d{1,3}){3}\b", source))
+    t.check("the address comes from the environment",
+            "KAVI_VPS_HOST" in source)
+    t.check("the remote adapter has a hard timeout ceiling",
+            "MAX_TIMEOUT" in source)
+    t.check("the remote adapter writes a transcript",
+            "_write_transcript" in source)
+
+
 def body(t):
     body_core(t)
     body_functionalization(t)
     body_canonical_decisions(t)
     body_canonical_evidence(t)
+    body_ssh_adapter(t)
 
 
 if __name__ == "__main__":

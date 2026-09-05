@@ -268,4 +268,8 @@ class HermesExecutionAdapter(ExecutionCapability):
 def get_adapter(kind: str = "null", **kwargs: Any) -> ExecutionCapability:
     if kind == "hermes":
         return HermesExecutionAdapter(**kwargs)
+    if kind == "ssh":
+        # Imported lazily so the local adapter never depends on the remote one.
+        from kavi.infrastructure.ssh_execution import SSHExecutionAdapter
+        return SSHExecutionAdapter(**kwargs)
     return NullExecutionAdapter()
