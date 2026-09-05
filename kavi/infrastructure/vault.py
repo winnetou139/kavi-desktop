@@ -224,6 +224,78 @@ class VaultReader:
 
     # ------------------------------------------------------------ decisions
 
+    def programme(self) -> dict[str, Any]:
+        """The KAVI programme roadmap, read from the vault.
+
+        The Founder asked where his own plan stands. That plan is a vault
+        note, so it is read from there rather than restated -- the same
+        discipline applied to decisions and evidence.
+
+        Returns every field UNKNOWN when the note is absent. A programme
+        status that guesses is worse than one that admits it cannot see.
+        """
+        blank = {
+            "source": "CANONICAL VAULT",
+            "available": False,
+            "access": "NOT FOUND",
+            "phases": [],
+            "current_phase": UNKNOWN_TEXT,
+            "current_scope": UNKNOWN_TEXT,
+            "counts": {},
+            "detail": ("KAVI Program Roadmap.md is not in the vault, so the "
+                       "programme phase is UNKNOWN."),
+        }
+        if self.root is None:
+            return blank
+        note = self.root / "02_VENTURE_SYSTEM" / "KAVI Program Roadmap.md"
+        if not note.is_file():
+            return blank
+        try:
+            text = note.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return blank
+
+        block = text.split("## Program phases", 1)
+        if len(block) < 2:
+            return blank
+        body = block[1].split("\n## ", 1)[0]
+
+        phases: list[dict[str, str]] = []
+        for line in body.splitlines():
+            line = line.strip()
+            if not line.startswith("|") or line.startswith("|---"):
+                continue
+            cells = [c.strip() for c in line.strip("|").split("|")]
+            if len(cells) < 3 or cells[0].lower() == "phase":
+                continue
+            phases.append({
+                "id": _plain_cell(cells[0]),
+                "scope": _plain_cell(cells[1]),
+                "state": _programme_state(cells[2]),
+                "origin": "VAULT",
+            })
+
+        counts: dict[str, int] = {}
+        for phase in phases:
+            counts[phase["state"]] = counts.get(phase["state"], 0) + 1
+        current = next((p for p in phases if p["state"] == "IN PROGRESS"), None)
+        blocked = [p["id"] for p in phases if p["state"] == "BLOCKED"]
+
+        return {
+            "source": "CANONICAL VAULT",
+            "available": True,
+            "access": "READ ONLY",
+            "phases": phases,
+            "phase_count": len(phases),
+            "counts": counts,
+            "current_phase": current["id"] if current else UNKNOWN_TEXT,
+            "current_scope": current["scope"] if current else UNKNOWN_TEXT,
+            "blocked": blocked,
+            "detail": ("Programme phases are read from "
+                       "02_VENTURE_SYSTEM/KAVI Program Roadmap.md. The cockpit "
+                       "never writes to the vault and may not advance a phase."),
+        }
+
     def decisions(self) -> list[dict[str, Any]]:
         """Read the canonical decision records from 08_DECISIONS/.
 
@@ -463,3 +535,30 @@ class VaultReader:
             })
         results.sort(key=lambda row: (not row["in_title"], -row["hits"]))
         return results[:limit]
+
+
+def _plain_cell(cell: str) -> str:
+    """Strip markdown emphasis and links from a table cell."""
+    import re as _re
+    cell = _re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", cell)
+    return cell.replace("**", "").replace("*", "").replace("`", "").strip()
+
+
+def _programme_state(cell: str) -> str:
+    """Map a roadmap state cell to one stable token."""
+    plain = _plain_cell(cell).upper()
+    if not plain:
+        return UNKNOWN_TEXT
+    if plain.startswith("DONE"):
+        return "DONE"
+    if "IN PROGRESS" in plain:
+        return "IN PROGRESS"
+    if plain.startswith("BLOCKED"):
+        return "BLOCKED"
+    if plain.startswith("PARTIAL"):
+        return "PARTIAL"
+    if "NOT STARTED" in plain:
+        return "NOT STARTED"
+    if plain.startswith("PENDING"):
+        return "PENDING"
+    return UNKNOWN_TEXT

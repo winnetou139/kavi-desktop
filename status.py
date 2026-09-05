@@ -42,6 +42,17 @@ def _get(path: str, timeout: int = 10) -> dict | None:
         return None
 
 
+def _read_vault_directly() -> dict | None:
+    """Read the programme roadmap when the cockpit is not running."""
+    try:
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+        from kavi.infrastructure.vault import VaultReader
+        result = VaultReader().programme()
+        return result if result.get("available") else None
+    except Exception:
+        return None
+
+
 def _read_repo_directly() -> dict | None:
     """Fall back to reading the product repo when the cockpit is not running.
 
@@ -63,12 +74,14 @@ def _read_repo_directly() -> dict | None:
 def build() -> dict:
     """Collect everything, tolerating any source being unavailable."""
     program = _get("/api/vecyra") or _read_repo_directly()
+    programme = _get("/api/programme") or _read_vault_directly()
     decisions = _get("/api/decisions")
     objectives = _get("/api/objectives")
     execution = _get("/api/execution")
     ledger = _get("/api/ledger")
     return {
         "program": program,
+        "programme": programme,
         "decisions": decisions,
         "objectives": objectives,
         "execution": execution,
@@ -81,6 +94,26 @@ def build() -> dict:
 def render(data: dict, telegram: bool = False) -> str:
     b = "*" if telegram else ""
     lines: list[str] = [f"{b}KAVI — STATUS{b}   {data['at']}", ""]
+
+    # ---- the Founder's own programme, first ----------------------------
+    prog = data.get("programme")
+    if prog and prog.get("available"):
+        lines += [
+            f"{b}RENCANA KAVI{b}",
+            f"  Fase kini : {prog.get('current_phase', UNKNOWN)}",
+            f"  Isi       : {str(prog.get('current_scope', UNKNOWN)).split(':')[0][:52]}",
+        ]
+        blocked = prog.get("blocked") or []
+        if blocked:
+            lines.append(f"  Tertahan  : {', '.join(blocked)}")
+        lines.append("")
+        for phase in prog.get("phases", []):
+            mark = {"DONE": "[x]", "IN PROGRESS": "[>]",
+                    "BLOCKED": "[!]"}.get(phase["state"], "[ ]")
+            lines.append(f"  {mark} {phase['id']:4} {phase['state']}")
+        lines.append("")
+    else:
+        lines += ["RENCANA KAVI", "  vault tidak terbaca — fase UNKNOWN", ""]
 
     # ---- VECYRA build programme ----------------------------------------
     program = data["program"]

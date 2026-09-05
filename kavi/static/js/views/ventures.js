@@ -19,6 +19,11 @@ export async function render(host, ctx) {
   let program = null;
   try { program = await api.vecyra(); } catch (e) { program = null; }
 
+  // The Founder's own programme, read from the vault. Shown before the
+  // product roadmap: his plan is the wider frame, VECYRA sits inside it.
+  let programme = null;
+  try { programme = await api.programme(); } catch (e) { programme = null; }
+
   const stats = [{ v: ventures.length, l: 'Ventures', tone: 'mint' }];
   if (program && program.available) {
     stats.push({ v: program.current_phase, l: 'Build phase', tone: 'amber' });
@@ -33,6 +38,31 @@ export async function render(host, ctx) {
   }
 
   const stack = el('div', { class: 'stack' });
+
+  // ---- KAVI programme (the Founder's own plan) -------------------------
+  if (programme && programme.available) {
+    const body = el('div', { class: 'stack' });
+    body.appendChild(kv([
+      ['Source', programme.source],
+      ['Access', programme.access],
+      ['Current phase', `${programme.current_phase} — ${programme.current_scope}`],
+      ['Blocked', (programme.blocked || []).length
+        ? programme.blocked.join(', ') : 'none'],
+    ]));
+    const ladder = el('div', { class: 'gates' });
+    for (const phase of programme.phases) {
+      const tone = phase.state === 'DONE' ? 'done'
+                 : phase.state === 'IN PROGRESS' ? 'active'
+                 : phase.state === 'BLOCKED' ? 'partial' : 'todo';
+      const cell = el('div', { class: `gate gate-${tone}`, title: phase.scope });
+      cell.appendChild(el('b', { text: phase.id }));
+      cell.appendChild(el('span', { text: phase.state }));
+      ladder.appendChild(cell);
+    }
+    body.appendChild(ladder);
+    body.appendChild(notice(programme.detail, 'amber'));
+    stack.appendChild(panel('KAVI programme', body, originChip('VAULT')));
+  }
 
   // ---- VECYRA build programme (read-only, from the product repo) --------
   if (program) {

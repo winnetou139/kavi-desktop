@@ -806,6 +806,63 @@ def body_telemetry(t):
             "0.000" not in source and "per_token" not in source)
 
 
+# ------------------------------------------------ the KAVI programme itself
+
+
+def body_kavi_programme(t):
+    """The Founder's own plan must be read from the vault, never restated."""
+    from kavi.infrastructure.vault import VaultReader
+
+    absent = VaultReader(root="/no/such/vault")
+    blank = absent.programme()
+    t.check("a missing vault reports NOT FOUND", blank["access"] == "NOT FOUND")
+    t.check("a missing vault yields no phases", blank["phases"] == [])
+    t.check("a missing vault does not guess a phase",
+            blank["current_phase"] not in ("P0", "P1", "P5"))
+
+    reader = VaultReader()
+    programme = reader.programme()
+    if not programme.get("available"):
+        t.check("programme note absent here; parsing not exercised", True)
+        return
+
+    t.equals("the programme is read only", programme["access"], "READ ONLY")
+    ids = [p["id"] for p in programme["phases"]]
+    t.check("the roadmap yields phases", len(ids) >= 5, str(ids))
+    for expected in ("P0", "P5"):
+        t.check(f"phase {expected} is read", expected in ids, str(ids))
+
+    states = {p["state"] for p in programme["phases"]}
+    known = {"DONE", "IN PROGRESS", "PARTIAL", "PENDING", "BLOCKED",
+             "NOT STARTED", "UNKNOWN"}
+    t.check("phase states use the known vocabulary", states <= known, str(states))
+    t.check("every phase carries origin VAULT",
+            all(p["origin"] == "VAULT" for p in programme["phases"]))
+    t.check("no phase scope is empty",
+            all(p["scope"] for p in programme["phases"]))
+
+    # The roadmap must keep admitting what has not been achieved. A programme
+    # file that quietly turns everything green is worse than none.
+    note = (reader.root / "02_VENTURE_SYSTEM" / "KAVI Program Roadmap.md")
+    if note.is_file():
+        text = note.read_text(encoding="utf-8", errors="replace")
+        t.check("the roadmap refuses a completion percentage",
+                "No completion percentage" in text)
+        t.check("the roadmap still records D-006 as not passed",
+                "NOT PASSED" in text)
+        t.check("the roadmap names its own fragility",
+                "Known fragility" in text)
+        t.check("the roadmap does not claim autonomy",
+                "Autonomy must be earned" in text)
+
+    # Reading the vault must stay read-only in fact, not only in wording.
+    source = (pathlib.Path(__file__).resolve().parents[1]
+              / "kavi" / "infrastructure" / "vault.py").read_text(encoding="utf-8")
+    for forbidden in ("write_text(", "unlink(", "mkdir("):
+        t.check(f"the vault reader never calls {forbidden}",
+                forbidden not in source)
+
+
 def body(t):
     body_core(t)
     body_functionalization(t)
@@ -814,6 +871,7 @@ def body(t):
     body_ssh_adapter(t)
     body_vecyra_program(t)
     body_telemetry(t)
+    body_kavi_programme(t)
 
 
 if __name__ == "__main__":

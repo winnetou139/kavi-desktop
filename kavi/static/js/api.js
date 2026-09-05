@@ -49,6 +49,7 @@ export const api = {
   decideInboxItem: (id, disposition, note) =>
     request('POST', '/api/inbox/decide', { id, disposition, note }),
 
+  programme: () => get('/api/programme'),
   vecyra: () => get('/api/vecyra'),
   ledger: () => get('/api/ledger'),
   ventures: () => request('GET', '/api/ventures'),

@@ -585,6 +585,10 @@ class CockpitService:
 
     # ---------------------------------------------------------- decisions
 
+    def kavi_programme(self) -> dict[str, Any]:
+        """Where the Founder's own plan stands, read from the vault."""
+        return self.vault.programme()
+
     def vecyra_program(self) -> dict[str, Any]:
         """VECYRA phase and gate state, read from the product repo.
 
